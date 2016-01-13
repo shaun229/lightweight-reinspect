@@ -2,3 +2,6 @@ data/
 *.pyc
 *.swp
 *.so
+*.h5
+*.jpg
+
