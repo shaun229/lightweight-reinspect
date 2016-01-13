@@ -1,6 +1,7 @@
 """train.py is used to generate and train the
 ReInspect deep network architecture."""
-
+import time
+import cv2
 import numpy as np
 import json
 import os
@@ -13,7 +14,7 @@ from apollocaffe.layers import (Power, LstmUnit, Convolution, NumpyData,
                                 Softmax, Concat, Dropout, InnerProduct)
 
 from utils import (annotation_jitter, image_to_h5,
-                   annotation_to_h5, load_data_mean)
+                   annotation_to_h5, load_data_mean, Rect, stitch_rects)
 from utils.annolist import AnnotationLib as al
 
 def load_idl(idlfile, data_mean, net_config, jitter=True):
@@ -56,7 +57,16 @@ def generate_decapitated_googlenet(net, net_config):
             for p in layer.p.param:
                 p.lr_mult *= net_config["googlenet_lr_mult"]
         net.f(layer)
-        if layer.p.name == "inception_5b/output":
+        if layer.p.name == "inception_3b/output":
+            net.f('''
+                name: "pool_final"
+                type: "Pooling"
+                bottom: "inception_3b/output"
+                top: "inception_final_output"
+                pooling_param {
+                    kernel_size: 4
+                    stride: 4
+                }''')
             break
 
 def generate_intermediate_layers(net):
@@ -64,7 +74,7 @@ def generate_intermediate_layers(net):
     from a NxCxWxH to (NxWxH)xCx1x1 that is used as input for the lstm layers.
     N = batch size, C = channels, W = grid width, H = grid height."""
 
-    net.f(Convolution("post_fc7_conv", bottoms=["inception_5b/output"],
+    net.f(Convolution("post_fc7_conv", bottoms=["inception_final_output"],
                       param_lr_mults=[1., 2.], param_decay_mults=[0., 0.],
                       num_output=1024, kernel_dim=(1, 1),
                       weight_filler=Filler("gaussian", 0.005),
@@ -216,6 +226,69 @@ def forward(net, input_data, net_config, deploy=False):
     else:
         return None
 
+def test(config):
+    """Test the model and output to test/output."""
+
+    net = apollocaffe.ApolloNet()
+
+    net_config = config["net"]
+    data_config = config["data"]
+    solver = config["solver"]
+
+    image_mean = load_data_mean(
+        data_config["idl_mean"], net_config["img_width"],
+        net_config["img_height"], image_scaling=1.0)
+
+    input_gen_test = load_idl(data_config["test_idl"],
+                                   image_mean, net_config, jitter=False)
+
+    forward(net, input_gen_test.next(), config["net"])
+
+    try:
+        net.load(solver["weights"])
+    except:
+        pass
+
+    net.phase = 'test'
+    test_loss = []
+    for i in range(solver["test_iter"]):
+        input_test = input_gen_test.next()
+        image = input_test["raw"]
+        tic = time.time()
+        bbox, conf = forward(net, input_test, config["net"], True)
+        print "forward deploy time", time.time() - tic
+        bbox_list = bbox
+        conf_list = conf
+        pix_per_w = 32
+        pix_per_h = 32
+
+        all_rects = [[[] for x in range(net_config['grid_width'])] for y in range(net_config['grid_height'])]
+        for n in range(len(bbox_list)):
+            for k in range(net_config['grid_width'] * net_config['grid_height']):
+                y = int(k / net_config['grid_width'])
+                x = int(k % net_config['grid_width'])
+                bbox = bbox_list[n][k]
+                conf = conf_list[n][k,1].flatten()[0]
+                abs_cx = pix_per_w/2 + pix_per_w*x + int(bbox[0,0,0])
+                abs_cy = pix_per_h/2 + pix_per_h*y+int(bbox[1,0,0])
+                w = bbox[2,0,0]
+                h = bbox[3,0,0]
+                all_rects[y][x].append(Rect(abs_cx,abs_cy,w,h,conf))
+        acc_rects = stitch_rects(all_rects)
+        #print acc_rects
+
+        for idx, rect in enumerate(acc_rects):
+            if rect.true_confidence < 0.9:
+                print 'rejected', rect.true_confidence
+                continue
+            else:
+                print 'found', rect.true_confidence
+                cv2.rectangle(image, (rect.cx-int(rect.width/2), rect.cy-int(rect.height/2)),
+                                   (rect.cx+int(rect.width/2), rect.cy+int(rect.height/2)),
+                                   (255,0,0),
+                                   2)
+        cv2.imwrite("test_output/img_out%s.jpg" % i, image)
+
 def train(config):
     """Trains the ReInspect model using SGD with momentum
     and prints out the logging information."""
@@ -232,17 +305,16 @@ def train(config):
         net_config["img_height"], image_scaling=1.0)
 
     input_gen = load_idl(data_config["train_idl"],
-                              image_mean, net_config)
+                              image_mean, net_config, jitter=False)
     input_gen_test = load_idl(data_config["test_idl"],
-                                   image_mean, net_config)
+                                   image_mean, net_config, jitter=False)
 
     forward(net, input_gen.next(), config["net"])
-    net.draw_to_file(logging["schematic_path"])
 
-    if solver["weights"]:
+    try:
         net.load(solver["weights"])
-    else:
-        net.load(googlenet.weights_file())
+    except:
+        pass
 
     loss_hist = {"train": [], "test": []}
     loggers = [
@@ -257,11 +329,19 @@ def train(config):
         if i % solver["test_interval"] == 0:
             net.phase = 'test'
             test_loss = []
-            for _ in range(solver["test_iter"]):
-                forward(net, input_gen_test.next(), config["net"], False)
+            #save the weights
+            net.save(solver["weights"])
+
+            for x in range(solver["test_iter"]):
+                test_input_data = input_gen_test.next()
+                tic = time.time()
+                forward(net, test_input_data, config["net"], False)
+                print "Forward pass", time.time() - tic
                 test_loss.append(net.loss)
+
             loss_hist["test"].append(np.mean(test_loss))
             net.phase = 'train'
+
         forward(net, input_gen.next(), config["net"])
         loss_hist["train"].append(net.loss)
         net.backward()
@@ -279,6 +359,7 @@ def main():
     and runs the trainer."""
     parser = apollocaffe.base_parser()
     parser.add_argument('--config', required=True)
+    parser.add_argument('--test')
     args = parser.parse_args()
     config = json.load(open(args.config, 'r'))
     if args.weights is not None:
@@ -288,7 +369,10 @@ def main():
     apollocaffe.set_device(args.gpu)
     apollocaffe.set_cpp_loglevel(args.loglevel)
 
-    train(config)
+    if args.test is not None:
+        test(config)
+    else:
+        train(config)
 
 if __name__ == "__main__":
     main()

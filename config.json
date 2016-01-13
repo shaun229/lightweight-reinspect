@@ -1,20 +1,20 @@
 {
     "data": {
-        "test_idl": "./data/brainwash/brainwash_val.idl",
-        "train_idl": "./data/brainwash/brainwash_train.idl",
-        "idl_mean": "./data/brainwash_mean.npy"
+        "test_idl": "./data/all_true_val_test.idl",
+        "train_idl": "./data/all_true_val_train.idl",
+        "idl_mean": "./data/zero_mean.npy"
     },
     "solver": {
-        "base_lr": 0.2,
-        "max_iter": 800001,
-        "test_iter": 100,
+        "base_lr": 0.15,
+        "max_iter": 200001,
+        "test_iter": 30,
         "test_interval": 1000,
         "momentum": 0.5,
         "random_seed": 2,
         "clip_gradients": 0.1,
         "gamma": 0.8,
         "stepsize": 100000,
-        "weights": ""
+        "weights": "weights/small_weights.h5"
     },
     "logging": {
         "display_interval": 100,
@@ -34,10 +34,10 @@
         "hungarian_permute_matches": true,
         "hungarian_loss_weight": 0.03,
         "googlenet_lr_mult": 4,
-        "grid_height": 15,
-        "grid_width": 20,
-        "img_height": 480,
-        "img_width": 640,
+        "grid_height": 10,
+        "grid_width": 15,
+        "img_height": 320,
+        "img_width": 480,
         "region_size": 64
     }
 }
