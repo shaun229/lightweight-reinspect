@@ -23,6 +23,8 @@ def load_data_mean(data_mean_filename, img_width, img_height, image_scaling = 1.
     data_mean = data_mean.astype(np.float32) / image_scaling
     return data_mean
 
+def convert_to_custom_grayscale(
+
 def image_to_h5(I, data_mean, image_scaling = 1.0):
 
     # normalization as needed for ipython notebook
