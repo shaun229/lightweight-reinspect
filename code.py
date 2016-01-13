@@ -13,7 +13,7 @@ from apollocaffe.layers import (Power, LstmUnit, Convolution, NumpyData,
                                 Transpose, Filler, SoftmaxWithLoss,
                                 Softmax, Concat, Dropout, InnerProduct)
 
-from utils import (annotation_jitter, image_to_h5_grayscale, image_to_h5,
+from utils import (annotation_jitter, image_to_h5,
                    annotation_to_h5, load_data_mean, Rect, stitch_rects)
 from utils.annolist import AnnotationLib as al
 
@@ -278,7 +278,7 @@ def test(config):
         #print acc_rects
 
         for idx, rect in enumerate(acc_rects):
-            if rect.true_confidence < 0.9:
+            if rect.true_confidence < 0.2:
                 print 'rejected', rect.true_confidence
                 continue
             else:

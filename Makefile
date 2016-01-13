@@ -20,6 +20,7 @@ test:
 	python code.py --config config.json --gpu 0 --test True
 
 .PHONY: test_cpu
+test_cpu:
 	python code.py --config config.json  --test True
 
 .PHONY: clean
