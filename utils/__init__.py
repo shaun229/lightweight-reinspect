@@ -25,7 +25,7 @@ def load_data_mean(data_mean_filename, img_width, img_height, image_scaling = 1.
 
 def image_to_h5(I, data_mean, image_scaling = 1.0):
 
-    # normalization as needed for ipython notebook
+    # normalization as needed for ipython notebookTODO
     I = I.astype(np.float32) / image_scaling - data_mean
 
     # MA: model expects BGR ordering
