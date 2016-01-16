@@ -14,7 +14,7 @@
         "clip_gradients": 0.1,
         "gamma": 0.8,
         "stepsize": 100000,
-        "weights": "weights/grayscale_weights.h5"
+        "weights": "weights/smallest_weights.h5"
     },
     "logging": {
         "display_interval": 100,
@@ -27,7 +27,7 @@
     },
     "net": {
         "init_range": 0.1,
-        "max_len": 5,
+        "max_len": 2,
         "lstm_num_cells": 250,
         "dropout_ratio": 0.15,
         "hungarian_match_ratio": 0.5,
