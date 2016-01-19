@@ -1,12 +1,12 @@
 {
     "data": {
-        "test_idl": "./data/all_true_val_test.idl",
-        "train_idl": "./data/all_true_val_train.idl",
+        "test_idl": "test_video.idl",
+        "train_idl": "train_video.idl",
         "idl_mean": "./data/zero_mean.npy"
     },
     "solver": {
         "base_lr": 0.15,
-        "max_iter": 200001,
+        "max_iter": 500001,
         "test_iter": 30,
         "test_interval": 1000,
         "momentum": 0.5,
@@ -14,7 +14,7 @@
         "clip_gradients": 0.1,
         "gamma": 0.8,
         "stepsize": 100000,
-        "weights": "weights/smallest_weights.h5"
+        "weights": "weights/full_weights.h5"
     },
     "logging": {
         "display_interval": 100,
