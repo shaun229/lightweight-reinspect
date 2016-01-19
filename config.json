@@ -1,20 +1,20 @@
 {
     "data": {
-        "test_idl": "./data/all_true_val_test.idl",
-        "train_idl": "./data/all_true_val_train.idl",
+        "test_idl": "./data/video_train.idl",
+        "train_idl": "./data/video_test.idl",
         "idl_mean": "./data/zero_mean.npy"
     },
     "solver": {
         "base_lr": 0.15,
-        "max_iter": 200001,
-        "test_iter": 30,
+        "max_iter": 30001,
+        "test_iter": 100,
         "test_interval": 1000,
         "momentum": 0.5,
         "random_seed": 2,
         "clip_gradients": 0.1,
         "gamma": 0.8,
         "stepsize": 100000,
-        "weights": "weights/small_weights.h5"
+        "weights": "weights/video_weights.h5"
     },
     "logging": {
         "display_interval": 100,
@@ -27,7 +27,7 @@
     },
     "net": {
         "init_range": 0.1,
-        "max_len": 5,
+        "max_len": 3,
         "lstm_num_cells": 250,
         "dropout_ratio": 0.15,
         "hungarian_match_ratio": 0.5,

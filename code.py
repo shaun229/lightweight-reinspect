@@ -17,7 +17,8 @@ from utils import (annotation_jitter, image_to_h5,
                    annotation_to_h5, load_data_mean, Rect, stitch_rects)
 from utils.annolist import AnnotationLib as al
 
-def load_idl(idlfile, data_mean, net_config, jitter=True):
+
+def load_idl(idlfile, data_mean, net_config, jitter=False, train=False):
     """Take the idlfile, data mean and net configuration and create a generator
     that outputs a jittered version of a random image from the annolist
     that is mean corrected."""
@@ -28,7 +29,8 @@ def load_idl(idlfile, data_mean, net_config, jitter=True):
         anno.imageName = os.path.join(
             os.path.dirname(os.path.realpath(idlfile)), anno.imageName)
     while True:
-        random.shuffle(annos)
+        #in video mode, we can't randomly shuffle the inputs
+        #random.shuffle(annos)
         for anno in annos:
             if jitter:
                 jit_image, jit_anno = annotation_jitter(
@@ -42,7 +44,13 @@ def load_idl(idlfile, data_mean, net_config, jitter=True):
                 jit_anno, net_config["grid_width"], net_config["grid_height"],
                 net_config["region_size"], net_config["max_len"])
             yield {"imname": anno.imageName, "raw": jit_image, "image": image,
-                   "boxes": boxes, "box_flags": box_flags}
+                   "boxes": boxes, "box_flags": box_flags, "anno": jit_anno}
+        #when the training video is done, we have to rest the memory seeds to empty again
+        if train:
+            global LSTM_HIDDEN_SEED
+            global LSTM_MEM_SEED
+            LSTM_HIDDEN_SEED = None
+            LSTM_MEM_SEED = None
 
 def generate_decapitated_googlenet(net, net_config):
     """Generates the googlenet layers until the inception_5b/output.
@@ -99,12 +107,19 @@ def generate_ground_truth_layers(net, box_flags, boxes):
 
 def generate_lstm_seeds(net, num_cells):
     """Generates the lstm seeds that are used as
+    global LSTM_MEM_SEED 
     input to the first lstm layer."""
 
-    net.f(NumpyData("lstm_hidden_seed",
-                    np.zeros((net.blobs["lstm_input"].shape[0], num_cells))))
-    net.f(NumpyData("lstm_mem_seed",
-                    np.zeros((net.blobs["lstm_input"].shape[0], num_cells))))
+
+    global LSTM_HIDDEN_SEED
+    global LSTM_MEM_SEED
+
+    if LSTM_HIDDEN_SEED == None:
+        LSTM_HIDDEN_SEED = np.zeros((net.blobs["lstm_input"].shape[0], num_cells)) 
+    if LSTM_MEM_SEED == None:
+        LSTM_MEM_SEED = np.zeros((net.blobs["lstm_input"].shape[0], num_cells))
+    net.f(NumpyData("lstm_hidden_seed", LSTM_HIDDEN_SEED))
+    net.f(NumpyData("lstm_mem_seed", LSTM_MEM_SEED))
 
 def get_lstm_params(step):
     """Depending on the step returns the corresponding
@@ -254,6 +269,7 @@ def test(config):
     for i in range(solver["test_iter"]):
         input_test = input_gen_test.next()
         image = input_test["raw"]
+        print input_test["anno"]
         tic = time.time()
         bbox, conf = forward(net, input_test, config["net"], True)
         print "forward deploy time", time.time() - tic
@@ -305,7 +321,7 @@ def train(config):
         net_config["img_height"], image_scaling=1.0)
 
     input_gen = load_idl(data_config["train_idl"],
-                              image_mean, net_config, jitter=False)
+                              image_mean, net_config, jitter=False, train=True)
     input_gen_test = load_idl(data_config["test_idl"],
                                    image_mean, net_config, jitter=False)
 
@@ -326,7 +342,12 @@ def train(config):
                                            logging["snapshot_prefix"]),
         ]
     for i in range(solver["start_iter"], solver["max_iter"]):
-        if i % solver["test_interval"] == 0:
+        if i % solver['test_interval'] == 0:
+            net.save(solver["weights"])
+            print "WEIGHTS SAVED"
+
+        #disable testing to prevent lstm memory corruption
+        if i % solver["test_interval"] == -1:
             net.phase = 'test'
             test_loss = []
             #save the weights
@@ -368,6 +389,11 @@ def main():
     apollocaffe.set_random_seed(config["solver"]["random_seed"])
     apollocaffe.set_device(args.gpu)
     apollocaffe.set_cpp_loglevel(args.loglevel)
+
+    global LSTM_HIDDEN_SEED 
+    global LSTM_MEM_SEED 
+    LSTM_HIDDEN_SEED = None
+    LSTM_MEM_SEED = None
 
     if args.test is not None:
         test(config)
