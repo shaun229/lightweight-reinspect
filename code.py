@@ -64,17 +64,91 @@ def generate_decapitated_googlenet(net, net_config):
         if layer.p.type in ["Convolution", "InnerProduct"]:
             for p in layer.p.param:
                 p.lr_mult *= net_config["googlenet_lr_mult"]
-        net.f(layer)
-        if layer.p.name == "inception_3b/output":
-            net.f('''
-                name: "pool_final"
+
+        #try reducing image size more agressively during first pooling phase
+        if layer.p.name == "pool1/3x3_s2":
+           net.f('''name: "pool1/3x3_s2"
                 type: "Pooling"
-                bottom: "inception_3b/output"
-                top: "inception_final_output"
+                bottom: "conv1/7x7_s2"
+                top: "pool1/3x3_s2"
                 pooling_param {
-                    kernel_size: 4
-                    stride: 4
+                  pool: MAX
+                  kernel_size: 3
+                  stride: 4
                 }''')
+           continue #skip that layer
+
+        if layer.p.name == "pool2/3x3_s2":
+            net.f('''
+            name: "pool2/3x3_s2"
+            type: "Pooling"
+            bottom: "conv2/norm2"
+            top: "pool2/3x3_s2"
+            pooling_param {
+              pool: MAX
+              kernel_size: 5
+              stride: 4
+            }''')
+            continue
+
+        if "5x5" in layer.p.name and "3a" in layer.p.name:
+            continue
+
+        if layer.p.name == "inception_3a/output":
+            net.f('''
+            name: "inception_3a/output"
+            type: "Concat"
+            bottom: "inception_3a/1x1"
+            bottom: "inception_3a/3x3"
+            bottom: "inception_3a/pool_proj"
+            top: "inception_3a/output"
+            ''')
+            continue
+
+        if layer.p.name == "inception_3b/5x5":
+            net.f('''  
+                name: "inception_3b/5x5"
+                type: "Convolution"
+                bottom: "inception_3b/5x5_reduce"
+                top: "inception_3b/5x5"
+                param {
+                    lr_mult: 1
+                    decay_mult: 1
+                }
+                param {
+                    lr_mult: 2
+                    decay_mult: 0
+                }
+                convolution_param {
+                    num_output: 32
+                    pad: 2
+                    kernel_size: 5
+                weight_filler {
+                    type: "xavier"
+                    std: 0.03
+                }
+                bias_filler {
+                    type: "constant"
+                    value: 0.2
+                }
+                }''')
+            continue
+
+
+
+        net.f(layer)
+
+        if layer.p.name == "inception_3b/output":
+            #print net.blobs["inception_3b/output"].shape
+            #net.f('''
+            #    name: "pool_final"
+            #    type: "Pooling"
+            #    bottom: "inception_3b/output"
+            #    top: "inception_final_output"
+            #    pooling_param {
+            #        kernel_size: 3
+            #        stride: 2
+            #    }''')
             break
 
 def generate_intermediate_layers(net):
@@ -82,7 +156,7 @@ def generate_intermediate_layers(net):
     from a NxCxWxH to (NxWxH)xCx1x1 that is used as input for the lstm layers.
     N = batch size, C = channels, W = grid width, H = grid height."""
 
-    net.f(Convolution("post_fc7_conv", bottoms=["inception_final_output"],
+    net.f(Convolution("post_fc7_conv", bottoms=["inception_3b/output"],
                       param_lr_mults=[1., 2.], param_decay_mults=[0., 0.],
                       num_output=1024, kernel_dim=(1, 1),
                       weight_filler=Filler("gaussian", 0.005),
@@ -210,7 +284,7 @@ def forward(net, input_data, net_config, deploy=False):
     net.f(NumpyData("image", data=image))
     tic = time.time()
     generate_decapitated_googlenet(net, net_config)
-#    print "decap pass", time.time() - tic
+    print "decap pass", time.time() - tic
     generate_intermediate_layers(net)
     if not deploy:
         generate_ground_truth_layers(net, box_flags, boxes)
