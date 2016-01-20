@@ -113,10 +113,10 @@ def generate_lstm_seeds(net, num_cells):
 
     global LSTM_HIDDEN_SEED
     global LSTM_MEM_SEED
-
-    if LSTM_HIDDEN_SEED == None:
+    #Test always forgetting
+    if True: #LSTM_HIDDEN_SEED == None: 
         LSTM_HIDDEN_SEED = np.zeros((net.blobs["lstm_input"].shape[0], num_cells)) 
-    if LSTM_MEM_SEED == None:
+    if True: #LSTM_MEM_SEED == None: 
         LSTM_MEM_SEED = np.zeros((net.blobs["lstm_input"].shape[0], num_cells))
     net.f(NumpyData("lstm_hidden_seed", LSTM_HIDDEN_SEED))
     net.f(NumpyData("lstm_mem_seed", LSTM_MEM_SEED))
@@ -208,7 +208,9 @@ def forward(net, input_data, net_config, deploy=False):
         boxes = np.array(input_data["boxes"])
 
     net.f(NumpyData("image", data=image))
+    tic = time.time()
     generate_decapitated_googlenet(net, net_config)
+#    print "decap pass", time.time() - tic
     generate_intermediate_layers(net)
     if not deploy:
         generate_ground_truth_layers(net, box_flags, boxes)
@@ -294,7 +296,7 @@ def test(config):
         #print acc_rects
 
         for idx, rect in enumerate(acc_rects):
-            if rect.true_confidence < 0.9:
+            if rect.true_confidence < 0.8:
                 print 'rejected', rect.true_confidence
                 continue
             else:
@@ -303,7 +305,7 @@ def test(config):
                                    (rect.cx+int(rect.width/2), rect.cy+int(rect.height/2)),
                                    (255,0,0),
                                    2)
-        cv2.imwrite("test_output/img_out%s.jpg" % i, image)
+        cv2.imwrite("test_output2/img_out%s.jpg" % i, image)
 
 def train(config):
     """Trains the ReInspect model using SGD with momentum
