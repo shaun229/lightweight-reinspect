@@ -103,60 +103,18 @@ def generate_decapitated_googlenet(net, net_config):
             bottom: "inception_3a/pool_proj"
             top: "inception_3a/output"
             ''')
-            continue
-
-        if layer.p.name == "inception_3b/5x5":
-            net.f('''  
-                name: "inception_3b/5x5"
-                type: "Convolution"
-                bottom: "inception_3b/5x5_reduce"
-                top: "inception_3b/5x5"
-                param {
-                    lr_mult: 1
-                    decay_mult: 1
-                }
-                param {
-                    lr_mult: 2
-                    decay_mult: 0
-                }
-                convolution_param {
-                    num_output: 32
-                    pad: 2
-                    kernel_size: 5
-                weight_filler {
-                    type: "xavier"
-                    std: 0.03
-                }
-                bias_filler {
-                    type: "constant"
-                    value: 0.2
-                }
-                }''')
-            continue
-
-
+            print net.blobs["inception_3a/output"].shape
+            break
 
         net.f(layer)
 
-        if layer.p.name == "inception_3b/output":
-            #print net.blobs["inception_3b/output"].shape
-            #net.f('''
-            #    name: "pool_final"
-            #    type: "Pooling"
-            #    bottom: "inception_3b/output"
-            #    top: "inception_final_output"
-            #    pooling_param {
-            #        kernel_size: 3
-            #        stride: 2
-            #    }''')
-            break
 
 def generate_intermediate_layers(net):
     """Takes the output from the decapitated googlenet and transforms the output
     from a NxCxWxH to (NxWxH)xCx1x1 that is used as input for the lstm layers.
     N = batch size, C = channels, W = grid width, H = grid height."""
 
-    net.f(Convolution("post_fc7_conv", bottoms=["inception_3b/output"],
+    net.f(Convolution("post_fc7_conv", bottoms=["inception_3a/output"],
                       param_lr_mults=[1., 2.], param_decay_mults=[0., 0.],
                       num_output=1024, kernel_dim=(1, 1),
                       weight_filler=Filler("gaussian", 0.005),
