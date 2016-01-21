@@ -56,56 +56,181 @@ def generate_decapitated_googlenet(net, net_config):
     """Generates the googlenet layers until the inception_5b/output.
     The output feature map is then used to feed into the lstm layers."""
 
-    google_layers = googlenet.googlenet_layers()
-    google_layers[0].p.bottom[0] = "image"
-    for layer in google_layers:
-        if "loss" in layer.p.name:
-            continue
-        if layer.p.type in ["Convolution", "InnerProduct"]:
-            for p in layer.p.param:
-                p.lr_mult *= net_config["googlenet_lr_mult"]
+    net.f("""
+        name: "conv1/3x3_s2"
+        type: "Convolution"
+        bottom: "image"
+        top: "conv1/3x3_s2"
+        param {
+            lr_mult: 1
+            decay_mult: 1
+        }
+        param {
+            lr_mult: 2
+            decay_mult: 0
+        }
+        convolution_param {
+            num_output: 20
+            pad: 1
+            kernel_size: 3
+            stride: 2
+            weight_filler {
+              type: "xavier"
+              std: 0.1
+            }
+            bias_filler {
+              type: "constant"
+              value: 0.2
+            }
+        }
+        """)
+    #print net.blobs["conv1/3x3_s2"].shape, 160 #160
+    net.f("""
+        name: "conv1/relu_3x3"
+        type: "ReLU"
+        bottom: "conv1/3x3_s2"
+        top: "conv1/3x3_s2"  
+        """)
 
-        #try reducing image size more agressively during first pooling phase
-        if layer.p.name == "pool1/3x3_s2":
-           net.f('''name: "pool1/3x3_s2"
-                type: "Pooling"
-                bottom: "conv1/7x7_s2"
-                top: "pool1/3x3_s2"
-                pooling_param {
-                  pool: MAX
-                  kernel_size: 3
-                  stride: 4
-                }''')
-           continue #skip that layer
+    net.f("""
+        name: "pool1/3x3_s2"
+        type: "Pooling"
+        bottom: "conv1/3x3_s2"
+        top: "pool1/3x3_s2"
+        pooling_param {
+            pool: MAX
+            kernel_size: 3
+            stride: 2
+        }
+        """)
+    #print net.blobs["pool1/3x3_s2"].shape, 80 #80
+    #lrn layer
+    net.f("""
+        name: "pool1/norm1"
+        type: "LRN"
+        bottom: "pool1/3x3_s2"
+        top: "pool1/norm1"
+        lrn_param {
+            local_size: 5
+            alpha: 0.0001
+            beta: 0.75
+        }
+        """)
 
-        if layer.p.name == "pool2/3x3_s2":
-            net.f('''
-            name: "pool2/3x3_s2"
-            type: "Pooling"
-            bottom: "conv2/norm2"
-            top: "pool2/3x3_s2"
-            pooling_param {
-              pool: MAX
-              kernel_size: 5
-              stride: 4
-            }''')
-            continue
+    net.f("""
+        name: "conv2/3x3"
+        type: "Convolution"
+        bottom: "pool1/norm1"
+        top: "conv2/3x3"
+        param {
+            lr_mult: 1
+            decay_mult: 1
+        }
+        param {
+            lr_mult: 2
+            decay_mult: 0
+        }
+        convolution_param {
+            num_output: 60
+            pad: 1
+            kernel_size: 3
+            stride: 2
+            weight_filler {
+              type: "xavier"
+              std: 0.03
+            }
+            bias_filler {
+              type: "constant"
+              value: 0.2
+            }
+        }
+        """)
 
-        if "5x5" in layer.p.name and "3a" in layer.p.name:
-            continue
+    #print net.blobs["conv2/3x3"].shape, 40 #40
 
-        if layer.p.name == "inception_3a/output":
-            net.f('''
-            name: "inception_3a/output"
-            type: "Concat"
-            bottom: "inception_3a/1x1"
-            bottom: "inception_3a/3x3"
-            bottom: "inception_3a/pool_proj"
-            top: "inception_3a/output"
-            ''')
-            break
+    net.f("""
+        name: "conv2/relu_3x3"
+        type: "ReLU"
+        bottom: "conv2/3x3"
+        top: "conv2/3x3"    
+        """)
 
-        net.f(layer)
+    #lrn before pool
+
+    net.f("""
+        name: "conv2/norm2"
+        type: "LRN"
+        bottom: "conv2/3x3"
+        top: "conv2/norm2"
+        lrn_param {
+            local_size: 5
+            alpha: 0.0001
+            beta: 0.75
+        }
+        """)
+
+    net.f("""
+        name: "pool2/3x3_s2"
+        type: "Pooling"
+        bottom: "conv2/norm2"
+        top: "pool2/3x3_s2"
+        pooling_param {
+            pool: MAX
+            kernel_size: 3
+            stride: 2
+        }
+        """)
+
+    #print net.blobs["pool2/3x3_s2"].shape, 20 #20
+
+    net.f("""
+     name: "conv3/5x5"
+      type: "Convolution"
+      bottom: "pool2/3x3_s2"
+      top: "conv3/5x5"
+      param {
+        lr_mult: 1
+        decay_mult: 1
+      }
+      param {
+        lr_mult: 2
+        decay_mult: 0
+      }
+      convolution_param {
+        num_output: 100
+        pad: 2
+        kernel_size: 5
+        weight_filler {
+          type: "xavier"
+          std: 0.03
+        }
+        bias_filler {
+          type: "constant"
+          value: 0.2
+        }
+      }
+      """)
+    #print  net.blobs["conv3/5x5"].shape, 20 #20
+
+    net.f("""
+        name: "conv3/relu_5x5"
+        type: "ReLU"
+        bottom: "conv3/5x5"
+        top: "conv3/5x5"
+        """)
+
+    net.f("""
+        name: "conv3/pool"
+        type: "Pooling"
+        bottom: "conv3/5x5"
+        top: "final_output"
+        pooling_param {
+            pool: MAX
+            kernel_size: 3
+            stride: 2
+        }
+        """)
+    #print net.blobs["final_output"].shape, 10
 
 
 def generate_intermediate_layers(net):
@@ -113,7 +238,7 @@ def generate_intermediate_layers(net):
     from a NxCxWxH to (NxWxH)xCx1x1 that is used as input for the lstm layers.
     N = batch size, C = channels, W = grid width, H = grid height."""
 
-    net.f(Convolution("post_fc7_conv", bottoms=["inception_3a/output"],
+    net.f(Convolution("post_fc7_conv", bottoms=["final_output"],
                       param_lr_mults=[1., 2.], param_decay_mults=[0., 0.],
                       num_output=1024, kernel_dim=(1, 1),
                       weight_filler=Filler("gaussian", 0.005),
@@ -241,7 +366,7 @@ def forward(net, input_data, net_config, deploy=False):
     net.f(NumpyData("image", data=image))
     tic = time.time()
     generate_decapitated_googlenet(net, net_config)
-#    print "decap pass", time.time() - tic
+    #print "decap pass", time.time() - tic
     generate_intermediate_layers(net)
     if not deploy:
         generate_ground_truth_layers(net, box_flags, boxes)
