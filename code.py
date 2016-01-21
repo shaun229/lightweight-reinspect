@@ -103,7 +103,6 @@ def generate_decapitated_googlenet(net, net_config):
             bottom: "inception_3a/pool_proj"
             top: "inception_3a/output"
             ''')
-            print net.blobs["inception_3a/output"].shape
             break
 
         net.f(layer)
@@ -242,7 +241,7 @@ def forward(net, input_data, net_config, deploy=False):
     net.f(NumpyData("image", data=image))
     tic = time.time()
     generate_decapitated_googlenet(net, net_config)
-    print "decap pass", time.time() - tic
+#    print "decap pass", time.time() - tic
     generate_intermediate_layers(net)
     if not deploy:
         generate_ground_truth_layers(net, box_flags, boxes)
