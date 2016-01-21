@@ -5,15 +5,15 @@
         "idl_mean": "./data/zero_mean.npy"
     },
     "solver": {
-        "base_lr": 0.15,
+        "base_lr": 0.05,
         "max_iter": 30001,
         "test_iter": 150,
         "test_interval": 1000,
-        "momentum": 0.5,
+        "momentum": 0.3,
         "random_seed": 2,
         "clip_gradients": 0.1,
         "gamma": 0.8,
-        "stepsize": 100000,
+        "stepsize": 1000,
         "weights": "weights/video_forget_weights.h5"
     },
     "logging": {

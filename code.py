@@ -91,6 +91,63 @@ def generate_decapitated_googlenet(net, net_config):
             }''')
             continue
 
+        if layer.p.name == "inception_3a/3x3_reduce":
+           net.f("""
+            name: "inception_3a/3x3_reduce"
+            type: "Convolution"
+            bottom: "pool2/3x3_s2"
+            top: "inception_3a/3x3_reduce"
+            param {
+            lr_mult: 1
+            decay_mult: 1
+            }
+            param {
+            lr_mult: 2
+            decay_mult: 0
+            }
+            convolution_param {
+            num_output: 64
+            kernel_size: 1
+            weight_filler {
+              type: "xavier"
+              std: 0.09
+            }
+            bias_filler {
+              type: "constant"
+              value: 0.2
+            }
+            }""")
+           continue
+ 
+        if layer.p.name == "inception_3a/3x3":
+           net.f("""
+            name: "inception_3a/3x3"
+            type: "Convolution"
+            bottom: "inception_3a/3x3_reduce"
+            top: "inception_3a/3x3"
+            param {
+            lr_mult: 1
+            decay_mult: 1
+            }
+            param {
+            lr_mult: 2
+            decay_mult: 0
+            }
+            convolution_param {
+            num_output: 96
+            pad: 1
+            kernel_size: 3
+            weight_filler {
+              type: "xavier"
+              std: 0.03
+            }
+            bias_filler {
+              type: "constant"
+              value: 0.2
+            }
+            }""")
+           continue
+
         if "5x5" in layer.p.name and "3a" in layer.p.name:
             continue
 
