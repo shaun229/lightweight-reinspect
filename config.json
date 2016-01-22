@@ -11,7 +11,7 @@
         "test_interval": 1000,
         "momentum": 0.3,
         "random_seed": 2,
-        "clip_gradients": 0.1,
+        "clip_gradients": 0.05,
         "gamma": 0.8,
         "stepsize": 1000,
         "weights": "weights/video_3x3_reduced_3a.h5"
