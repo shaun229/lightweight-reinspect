@@ -1,7 +1,7 @@
 {
     "data": {
-        "test_idl": "test_video.idl",
-        "train_idl": "train_video.idl",
+        "test_idl": "./data/video_test.idl",
+        "train_idl": "./data/video_train.idl",
         "idl_mean": "./data/zero_mean.npy"
     },
     "solver": {
@@ -14,7 +14,7 @@
         "clip_gradients": 0.1,
         "gamma": 0.8,
         "stepsize": 100000,
-        "weights": "weights/full_weights.h5"
+        "weights": "weights/3a_minus_5x5.h5"
     },
     "logging": {
         "display_interval": 100,
