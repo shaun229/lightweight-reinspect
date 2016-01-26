@@ -106,7 +106,7 @@ def generate_decapitated_googlenet(net, net_config):
             decay_mult: 0
             }
             convolution_param {
-            num_output: 64
+            num_output: 96
             kernel_size: 1
             weight_filler {
               type: "xavier"
