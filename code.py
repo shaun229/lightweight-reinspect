@@ -41,6 +41,10 @@ def load_idl(idlfile, data_mean, net_config, jitter=True):
             boxes, box_flags = annotation_to_h5(
                 jit_anno, net_config["grid_width"], net_config["grid_height"],
                 net_config["region_size"], net_config["max_len"])
+            #print len( jit_anno.rects)
+            #if len(jit_anno.rects) == 0:
+               #if random.random() < 0.8:
+             #  continue               
             yield {"imname": anno.imageName, "raw": jit_image, "image": image,
                    "boxes": boxes, "box_flags": box_flags}
 
@@ -333,7 +337,8 @@ def test(config):
                                    (rect.cx+int(rect.width/2), rect.cy+int(rect.height/2)),
                                    (255,0,0),
                                    2)
-        cv2.imwrite("test_output/img_out%s.jpg" % i, image)
+        print input_test["imname"]
+        cv2.imwrite("test_output/%s.jpg" % input_test["imname"].split("/")[6], image)
 
 def train(config):
     """Trains the ReInspect model using SGD with momentum

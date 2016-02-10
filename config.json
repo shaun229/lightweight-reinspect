@@ -1,20 +1,20 @@
 {
     "data": {
-        "test_idl": "./data/video_test.idl",
-        "train_idl": "./data/video_train.idl",
+        "test_idl": "./data/zonecount_test2.idl",
+        "train_idl": "./data/zonecount_train.idl",
         "idl_mean": "./data/zero_mean.npy"
     },
     "solver": {
         "base_lr": 0.15,
-        "max_iter": 500001,
-        "test_iter": 30,
+        "max_iter": 300001,
+        "test_iter": 300,
         "test_interval": 1000,
         "momentum": 0.5,
         "random_seed": 2,
         "clip_gradients": 0.1,
         "gamma": 0.8,
         "stepsize": 100000,
-        "weights": "weights/3a_minus_5x5.h5"
+        "weights": "weights/zonecount_minus_5x5.h5"
     },
     "logging": {
         "display_interval": 100,
