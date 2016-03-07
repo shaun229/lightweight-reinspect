@@ -186,11 +186,11 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="parse video using nnet")
     parser.add_argument('video_file')
-    parser.add_argument('LOI_BOX_IN')    
-    parser.add_argument('LOI_BOX_OUT')        
-    parser.add_argument('INOUT')
+    parser.add_argument('-loi_in',  nargs='+', type=int)    
+    parser.add_argument('-loi_out', nargs='+', type=int)        
+    parser.add_argument('-inout', nargs='+', type=bool)
     args = parser.parse_args()    
-    
-    process_video(args.LOI_BOX_IN, args.LOI_BOX_OUT, args.INOUT, args.video_file)
+    print args.loi_in   
+    process_video(args.loi_in, args.loi_out, args.inout, args.video_file)
 
 

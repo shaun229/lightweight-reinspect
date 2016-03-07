@@ -484,12 +484,12 @@ def process_frame(frame):
     input_gen_test = load_idl(data_config["test_idl"],
                                    image_mean, net_config, jitter=False)
 
-    image  = image_to_h5(frame, data_mean, image_scaling=1.0)
+    image  = image_to_h5(frame, image_mean, image_scaling=1.0)
 
     input_test = {"imname": '', "raw": frame, "image": image}
 
 
-    forward(net, image, config["net"])
+    forward(net, image, config["net"], True)
 
     net.load(solver["weights"])
 
