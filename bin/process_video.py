@@ -1,14 +1,16 @@
+'''python bin/process_video.py /home/ubuntu/walkby.mp4 -loi_in 210 30 60 160 -loi_out 210 30 60 160 -inout False False
+'''
 import cv2
 from lib import nnet
 import argparse
 
 
-DIST_THRESHOLD = 50
+DIST_THRESHOLD = 60
 
 def detect_line_trip(bbox1, bbox2, x1, x2, y):
     '''detect if a horizontal line was tripped'''
-    if (bbox1[1] >= y and bbox2[1] <= y) or \
-            (bbox1[1] <= y and bbox2[1] >= y) and \
+    if ((bbox1[1] >= y and bbox2[1] <= y) or \
+            (bbox1[1] <= y and bbox2[1] >= y)) and \
             (x1 <= bbox1[0] and bbox1[0] <= x2) and \
             (x1 <= bbox2[0] and bbox2[0] <= x2):
         return True
@@ -17,9 +19,10 @@ def detect_line_trip(bbox1, bbox2, x1, x2, y):
 
 def detect_loi_line_trip(new_bbox, prev_bbox, LOI_BOX_IN, LOI_BOX_OUT, INOUT):
     '''returns tuple of loi trip status, walkin and walkout'''
+    
     in_status = 'None'
     out_status = 'None'
-    if INOUT[0]: #vertical orientation
+    if INOUT[0]: #vertical walkin/walkout
         #walkin status
         in_line1_status = detect_line_trip(new_bbox, prev_bbox, LOI_BOX_IN[0], LOI_BOX_IN[0]+LOI_BOX_IN[2], LOI_BOX_IN[1])
         in_line2_status = detect_line_trip(new_bbox, prev_bbox, LOI_BOX_IN[0], LOI_BOX_IN[0]+LOI_BOX_IN[2], LOI_BOX_IN[1]+LOI_BOX_IN[3])
@@ -28,17 +31,17 @@ def detect_loi_line_trip(new_bbox, prev_bbox, LOI_BOX_IN, LOI_BOX_OUT, INOUT):
         out_line1_status = detect_line_trip(new_bbox, prev_bbox, LOI_BOX_OUT[0], LOI_BOX_OUT[0]+LOI_BOX_OUT[2], LOI_BOX_OUT[1])
         out_line2_status = detect_line_trip(new_bbox, prev_bbox, LOI_BOX_OUT[0], LOI_BOX_OUT[0]+LOI_BOX_OUT[2], LOI_BOX_OUT[1]+LOI_BOX_OUT[3])
 
-    else: #horizontal orientation
+    else: #horizontal walkin/walkout
         temp_new_bbox = [new_bbox[1], new_bbox[0]]
         temp_prev_bbox = [prev_bbox[1], prev_bbox[0]]
 
         #walkin status
-        in_line1_status = detect_line_trip(new_bbox, prev_bbox, LOI_BOX_IN[1], LOI_BOX_IN[1]+LOI_BOX_IN[3], LOI_BOX_IN[0])
-        in_line2_status = detect_line_trip(new_bbox, prev_bbox, LOI_BOX_IN[1], LOI_BOX_IN[1]+LOI_BOX_IN[3], LOI_BOX_IN[0]+LOI_BOX_IN[2])
+        in_line1_status = detect_line_trip(temp_new_bbox, temp_prev_bbox, LOI_BOX_IN[1], LOI_BOX_IN[1]+LOI_BOX_IN[3], LOI_BOX_IN[0])
+        in_line2_status = detect_line_trip(temp_new_bbox, temp_prev_bbox, LOI_BOX_IN[1], LOI_BOX_IN[1]+LOI_BOX_IN[3], LOI_BOX_IN[0]+LOI_BOX_IN[2])
         
         #walkout status
-        out_line1_status = detect_line_trip(new_bbox, prev_bbox, LOI_BOX_OUT[1], LOI_BOX_OUT[1]+LOI_BOX_OUT[3], LOI_BOX_OUT[0])
-        out_line2_status = detect_line_trip(new_bbox, prev_bbox, LOI_BOX_OUT[1], LOI_BOX_OUT[1]+LOI_BOX_OUT[3], LOI_BOX_OUT[0]+LOI_BOX_OUT[2])        
+        out_line1_status = detect_line_trip(temp_new_bbox, temp_prev_bbox, LOI_BOX_OUT[1], LOI_BOX_OUT[1]+LOI_BOX_OUT[3], LOI_BOX_OUT[0])
+        out_line2_status = detect_line_trip(temp_new_bbox, temp_prev_bbox, LOI_BOX_OUT[1], LOI_BOX_OUT[1]+LOI_BOX_OUT[3], LOI_BOX_OUT[0]+LOI_BOX_OUT[2])        
 
     #update status
     if in_line1_status or in_line2_status:
@@ -75,6 +78,17 @@ def getClosestBBoxPair(new_bboxes, prev_bboxes):
                 closest_new_bbox = new_bbox
                 closest_prev_bbox = prev_bbox
                 min_dist = distance
+    #TODO: MOVING AVERAGE    
+    alpha = 0.4
+    if min_dist >= 0:
+        new_bboxes.remove(closest_new_bbox)
+        closest_new_bbox = (int(closest_prev_bbox[0]*(1-alpha) + closest_new_bbox[0]*alpha),int(closest_prev_bbox[1]*(1-alpha) + closest_new_bbox[1]*alpha), closest_new_bbox[2], closest_new_bbox[3])
+        new_bboxes.append(closest_new_bbox)
+        global frame
+        cv2.circle(frame, (closest_prev_bbox[0], closest_prev_bbox[1]), 6, (0,0,255))
+        cv2.putText(frame,str(int(min_dist)), (closest_prev_bbox[0]+8, closest_prev_bbox[1]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+        cv2.circle(frame, (closest_new_bbox[0], closest_new_bbox[1]), 6, (0,255,0))
+
     return [closest_new_bbox, closest_prev_bbox, min_dist]
 
 def process_loi_status(status, dir_bool, prev_bbox, prev_status, LOI_BOX):
@@ -92,10 +106,10 @@ def process_loi_status(status, dir_bool, prev_bbox, prev_status, LOI_BOX):
                 prev_bbox[0] >= LOI_BOX[0]+LOI_BOX[2]):
             traffic_event+=1
         status = 'None'
-    elif dir_bool and status == 'Top' and prev_status == 'Bottom':
+    elif not dir_bool and status == 'Top' and prev_status == 'Bottom':
         traffic_event+=1
         status = 'None'
-    elif not dir_bool and status == 'Bottom' and prev_status == 'Top':
+    elif dir_bool and status == 'Bottom' and prev_status == 'Top':
         traffic_event+=1
         status = 'None'
     elif status == 'None':
@@ -104,13 +118,12 @@ def process_loi_status(status, dir_bool, prev_bbox, prev_status, LOI_BOX):
     assert traffic_event <= 1 
     assert status in ['Both', 'Top', 'Bottom', 'None']
 
-    return [status, traffic_event]
+    return [traffic_event, status]
         
 
-def process_frame(frame, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT):
+def process_bboxes(new_bboxes, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT):
     '''Detect walkin/walkout if two lines are tripped and update loi status'''
 
-    new_bboxes = nnet.process_frame(frame)
     new_loi_status = {}
     new_prev_bboxes = []
 
@@ -151,8 +164,20 @@ def process_frame(frame, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, 
     #add any remaining bboxes
     new_prev_bboxes.extend(new_bboxes)
 
-    return (walkin, walkout, new_prev_bounding_boxes, new_loi_status)
+    return (walkin, walkout, new_prev_bboxes, new_loi_status)
 
+def get_frame(vidcap):
+    success, frame = vidcap.read()
+    if not success:
+       return (success, None)
+    r, g, b = cv2.split(frame)
+    return (success, cv2.merge((b,g,r)))
+
+def str2boolINOUT(INOUT):
+    '''convert str INOUT to bool INOUT'''
+    INOUT[0] = True if INOUT[0] == 'True' else False
+    INOUT[1] = True if INOUT[1] == 'True' else False
+    return INOUT
 
 def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
     """
@@ -169,18 +194,36 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
 
     walkin = 0
     walkout = 0
-
+    
+    global frame
     vidcap = cv2.VideoCapture(video_file)
-    success, frame = vidcap.read()
+    success, frame = get_frame(vidcap)
+
     prev_bboxes = {}
     prev_loi_status = {}
+    for _ in range(2015):
+	vidcap.read()
 
-    while success:
-        win, wout, prev_bboxes, prev_loi_status = process_frame(frame, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT)
+    count = 0
+    while success:        
+        new_bboxes = nnet.process_frame(frame, count)
+        win, wout, prev_bboxes, prev_loi_status = process_bboxes(new_bboxes, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT)
+ 
         walkin += win
         walkout += wout
-        sucess, frame = vidcap.read()
-        print walkin, walkout
+
+        #TODO
+        print prev_loi_status
+        cv2.rectangle(frame, (LOI_BOX_IN[0], LOI_BOX_IN[1]), (LOI_BOX_IN[0]+LOI_BOX_IN[2], LOI_BOX_IN[1]+LOI_BOX_IN[3]), (0,255,0))
+        cv2.rectangle(frame, (LOI_BOX_OUT[0], LOI_BOX_OUT[1]), (LOI_BOX_OUT[0]+LOI_BOX_OUT[2], LOI_BOX_OUT[1]+LOI_BOX_OUT[3]), (255,0,0))
+        cv2.putText(frame,str((walkin, walkout)), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+        cv2.imwrite("test_output/frame%s.jpg" % count, frame)
+
+        sucess, frame = get_frame(vidcap)
+        count += 1
+        if count == 500:
+           break
+        print walkin, walkout, count
 
 
 if __name__ == '__main__':
@@ -188,9 +231,8 @@ if __name__ == '__main__':
     parser.add_argument('video_file')
     parser.add_argument('-loi_in',  nargs='+', type=int)    
     parser.add_argument('-loi_out', nargs='+', type=int)        
-    parser.add_argument('-inout', nargs='+', type=bool)
+    parser.add_argument('-inout', nargs='+')
     args = parser.parse_args()    
-    print args.loi_in   
-    process_video(args.loi_in, args.loi_out, args.inout, args.video_file)
+    process_video(args.loi_in, args.loi_out, str2boolINOUT(args.inout), args.video_file)
 
 

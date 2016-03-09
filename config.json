@@ -5,16 +5,16 @@
         "idl_mean": "./data/zero_mean.npy"
     },
     "solver": {
-        "base_lr": 0.15,
-        "max_iter": 30001,
+        "base_lr": 0.2,
+        "max_iter": 100001,
         "test_iter": 150,
-        "test_interval": 1000,
-        "momentum": 0.3,
+        "test_interval": 300,
+        "momentum": 0.5,
         "random_seed": 2,
         "clip_gradients": 0.1,
         "gamma": 0.8,
-        "stepsize": 1000,
-        "weights": "weights/video_3x3_reduced_3a.h5"
+        "stepsize": 100000,
+        "weights": "weights/video_3b.h5"
     },
     "logging": {
         "display_interval": 100,
@@ -27,7 +27,7 @@
     },
     "net": {
         "init_range": 0.1,
-        "max_len": 3,
+        "max_len": 5,
         "lstm_num_cells": 250,
         "dropout_ratio": 0.15,
         "hungarian_match_ratio": 0.5,

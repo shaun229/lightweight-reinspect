@@ -30,8 +30,7 @@ def load_idl(idlfile, data_mean, net_config, jitter=False, train=False):
         anno.imageName = os.path.join(
             os.path.dirname(os.path.realpath(idlfile)), anno.imageName)
     while True:
-        #in video mode, we can't randomly shuffle the inputs
-        #random.shuffle(annos)
+        random.shuffle(annos)
         for anno in annos:
             if jitter:
                 jit_image, jit_anno = annotation_jitter(
@@ -47,11 +46,6 @@ def load_idl(idlfile, data_mean, net_config, jitter=False, train=False):
             yield {"imname": anno.imageName, "raw": jit_image, "image": image,
                    "boxes": boxes, "box_flags": box_flags, "anno": jit_anno}
         #when the training video is done, we have to rest the memory seeds to empty again
-        if train:
-            global LSTM_HIDDEN_SEED
-            global LSTM_MEM_SEED
-            LSTM_HIDDEN_SEED = None
-            LSTM_MEM_SEED = None
 
 def generate_decapitated_googlenet(net, net_config):
     """Generates the googlenet layers until the inception_5b/output.
@@ -66,104 +60,19 @@ def generate_decapitated_googlenet(net, net_config):
             for p in layer.p.param:
                 p.lr_mult *= net_config["googlenet_lr_mult"]
 
-        #try reducing image size more agressively during first pooling phase
-        if layer.p.name == "pool1/3x3_s2":
-           net.f('''name: "pool1/3x3_s2"
-                type: "Pooling"
-                bottom: "conv1/7x7_s2"
-                top: "pool1/3x3_s2"
-                pooling_param {
-                  pool: MAX
-                  kernel_size: 3
-                  stride: 4
-                }''')
-           continue #skip that layer
-
-        if layer.p.name == "pool2/3x3_s2":
-            net.f('''
-            name: "pool2/3x3_s2"
-            type: "Pooling"
-            bottom: "conv2/norm2"
-            top: "pool2/3x3_s2"
-            pooling_param {
-              pool: MAX
-              kernel_size: 5
-              stride: 4
-            }''')
-            continue
-
-        if layer.p.name == "inception_3a/3x3_reduce":
-           net.f("""
-            name: "inception_3a/3x3_reduce"
-            type: "Convolution"
-            bottom: "pool2/3x3_s2"
-            top: "inception_3a/3x3_reduce"
-            param {
-            lr_mult: 1
-            decay_mult: 1
-            }
-            param {
-            lr_mult: 2
-            decay_mult: 0
-            }
-            convolution_param {
-            num_output: 96
-            kernel_size: 1
-            weight_filler {
-              type: "xavier"
-              std: 0.09
-            }
-            bias_filler {
-              type: "constant"
-              value: 0.2
-            }
-            }""")
-           continue
- 
-        if layer.p.name == "inception_3a/3x3":
-           net.f("""
-            name: "inception_3a/3x3"
-            type: "Convolution"
-            bottom: "inception_3a/3x3_reduce"
-            top: "inception_3a/3x3"
-            param {
-            lr_mult: 1
-            decay_mult: 1
-            }
-            param {
-            lr_mult: 2
-            decay_mult: 0
-            }
-            convolution_param {
-            num_output: 96
-            pad: 1
-            kernel_size: 3
-            weight_filler {
-              type: "xavier"
-              std: 0.03
-            }
-            bias_filler {
-              type: "constant"
-              value: 0.2
-            }
-            }""")
-           continue
-
-        if "5x5" in layer.p.name and "3a" in layer.p.name:
-            continue
-
-        if layer.p.name == "inception_3a/output":
-            net.f('''
-            name: "inception_3a/output"
-            type: "Concat"
-            bottom: "inception_3a/1x1"
-            bottom: "inception_3a/3x3"
-            bottom: "inception_3a/pool_proj"
-            top: "inception_3a/output"
-            ''')
-            break
-
         net.f(layer)
+        #try reducing image size more agressively during first pooling phase
+        if layer.p.name == "inception_3b/output":
+           net.f('''
+                name: "pool_final"
+                type: "Pooling"
+                bottom: "inception_3b/output"
+                top: "inception_3b/output_final"
+                pooling_param {
+                    kernel_size: 4
+                    stride: 4
+                }''')
+           break
 
 
 def generate_intermediate_layers(net):
@@ -171,7 +80,7 @@ def generate_intermediate_layers(net):
     from a NxCxWxH to (NxWxH)xCx1x1 that is used as input for the lstm layers.
     N = batch size, C = channels, W = grid width, H = grid height."""
 
-    net.f(Convolution("post_fc7_conv", bottoms=["inception_3a/output"],
+    net.f(Convolution("post_fc7_conv", bottoms=["inception_3b/output_final"],
                       param_lr_mults=[1., 2.], param_decay_mults=[0., 0.],
                       num_output=1024, kernel_dim=(1, 1),
                       weight_filler=Filler("gaussian", 0.005),
@@ -200,13 +109,8 @@ def generate_lstm_seeds(net, num_cells):
     input to the first lstm layer."""
 
 
-    global LSTM_HIDDEN_SEED
-    global LSTM_MEM_SEED
-    #Test always forgetting
-    if True: #LSTM_HIDDEN_SEED == None: 
-        LSTM_HIDDEN_SEED = np.zeros((net.blobs["lstm_input"].shape[0], num_cells)) 
-    if True: #LSTM_MEM_SEED == None: 
-        LSTM_MEM_SEED = np.zeros((net.blobs["lstm_input"].shape[0], num_cells))
+    LSTM_HIDDEN_SEED = np.zeros((net.blobs["lstm_input"].shape[0], num_cells)) 
+    LSTM_MEM_SEED = np.zeros((net.blobs["lstm_input"].shape[0], num_cells))
     net.f(NumpyData("lstm_hidden_seed", LSTM_HIDDEN_SEED))
     net.f(NumpyData("lstm_mem_seed", LSTM_MEM_SEED))
 
@@ -350,10 +254,7 @@ def test(config):
 
     forward(net, input_gen_test.next(), config["net"])
 
-    try:
-        net.load(solver["weights"])
-    except:
-        pass
+    net.load(solver["weights"])
 
     net.phase = 'test'
     test_loss = []
@@ -390,6 +291,7 @@ def test(config):
                 continue
             else:
                 print 'found', rect.true_confidence
+                raw_input()
                 cv2.rectangle(image, (rect.cx-int(rect.width/2), rect.cy-int(rect.height/2)),
                                    (rect.cx+int(rect.width/2), rect.cy+int(rect.height/2)),
                                    (255,0,0),
@@ -437,8 +339,7 @@ def train(config):
             net.save(solver["weights"])
             print "WEIGHTS SAVED"
 
-        #disable testing to prevent lstm memory corruption
-        if i % solver["test_interval"] == -1:
+        if i % solver["test_interval"] == 0:
             net.phase = 'test'
             test_loss = []
             #save the weights
@@ -448,7 +349,7 @@ def train(config):
                 test_input_data = input_gen_test.next()
                 tic = time.time()
                 forward(net, test_input_data, config["net"], False)
-                print "Forward pass", time.time() - tic
+#                print "Forward pass", time.time() - tic
                 test_loss.append(net.loss)
 
             loss_hist["test"].append(np.mean(test_loss))
@@ -467,29 +368,28 @@ def train(config):
                            'apollo_net': net, 'start_iter': 0})
 
 
-def process_frame(frame):
+def process_frame(frame, frame_count):
     '''process uinsg reinspect'''
     config = json.load(open('config.json', 'r'))
     
     net = apollocaffe.ApolloNet()
+    apollocaffe.set_device(0)
 
     net_config = config["net"]
     data_config = config["data"]
     solver = config["solver"]
-
+    
     image_mean = load_data_mean(
         data_config["idl_mean"], net_config["img_width"],
         net_config["img_height"], image_scaling=1.0)
 
-    input_gen_test = load_idl(data_config["test_idl"],
-                                   image_mean, net_config, jitter=False)
 
     image  = image_to_h5(frame, image_mean, image_scaling=1.0)
 
     input_test = {"imname": '', "raw": frame, "image": image}
 
 
-    forward(net, image, config["net"], True)
+    forward(net, input_test, config["net"], True)
 
     net.load(solver["weights"])
 
@@ -515,17 +415,21 @@ def process_frame(frame):
     acc_rects = stitch_rects(all_rects)
     #print acc_rects
 
+    bbox_res = []
     for idx, rect in enumerate(acc_rects):
         if rect.true_confidence < 0.8:
             print 'rejected', rect.true_confidence
             continue
         else:
             print 'found', rect.true_confidence
-            cv2.rectangle(image, (rect.cx-int(rect.width/2), rect.cy-int(rect.height/2)),
+            cv2.rectangle(frame, (rect.cx-int(rect.width/2), rect.cy-int(rect.height/2)),
                                (rect.cx+int(rect.width/2), rect.cy+int(rect.height/2)),
                                (255,0,0),
                                2)
-    cv2.imwrite("test_output2/img_out%s.jpg" % i, image)
+            bbox_res.append((rect.cx, rect.cy, rect.width, rect.height))
+    #cv2.imwrite("/home/ubuntu/lightweight-reinspect/test_output2/img_out%s.jpg" % frame_count, frame)
+    return bbox_res
+
 
 def main():
     """Sets up all the configurations for apollocaffe, and ReInspect
@@ -542,10 +446,6 @@ def main():
     apollocaffe.set_device(args.gpu)
     apollocaffe.set_cpp_loglevel(args.loglevel)
 
-    global LSTM_HIDDEN_SEED 
-    global LSTM_MEM_SEED 
-    LSTM_HIDDEN_SEED = None
-    LSTM_MEM_SEED = None
 
     if args.test is not None:
         test(config)

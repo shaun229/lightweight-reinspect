@@ -8,20 +8,20 @@ all:
 .PHONY: train
 train: utils/stitch_wrapper.so data
 	@echo Training...
-	python code.py --config config.json --gpu 0
+	python lib/nnet.py --config config.json --gpu 0
 
 
 .PHONY: train_cpu
 train_cpu:
-	python code.py --config config.json 
+	python lib/nnet.py --config config.json 
 
 .PHONY: test
 test:
-	python code.py --config config.json --gpu 0 --test True
+	python lib/nnet.py --config config.json --gpu 0 --test True
 
 .PHONY: test_cpu
 test_cpu:
-	python code.py --config config.json  --test True
+	python lib/nnet.py --config config.json  --test True
 
 .PHONY: clean
 clean:
