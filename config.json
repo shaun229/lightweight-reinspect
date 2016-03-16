@@ -1,12 +1,12 @@
 {
     "data": {
-        "test_idl": "./data/video_test.idl",
-        "train_idl": "./data/video_train.idl",
+        "test_idl": "./data/march-result.idl",
+        "train_idl": "./data/march-result.idl",
         "idl_mean": "./data/zero_mean.npy"
     },
     "solver": {
         "base_lr": 0.2,
-        "max_iter": 100001,
+        "max_iter": 1001,
         "test_iter": 150,
         "test_interval": 300,
         "momentum": 0.5,
@@ -14,7 +14,7 @@
         "clip_gradients": 0.1,
         "gamma": 0.8,
         "stepsize": 100000,
-        "weights": "weights/video_3b.h5"
+        "weights": "weights/video_footwear_3b.h5"
     },
     "logging": {
         "display_interval": 100,

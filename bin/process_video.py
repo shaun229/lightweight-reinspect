@@ -3,7 +3,8 @@
 import cv2
 from lib import nnet
 import argparse
-
+import json
+import apollocaffe
 
 DIST_THRESHOLD = 60
 
@@ -79,7 +80,7 @@ def getClosestBBoxPair(new_bboxes, prev_bboxes):
                 closest_prev_bbox = prev_bbox
                 min_dist = distance
     #TODO: MOVING AVERAGE    
-    alpha = 0.4
+    alpha = 0.55
     if min_dist >= 0:
         new_bboxes.remove(closest_new_bbox)
         closest_new_bbox = (int(closest_prev_bbox[0]*(1-alpha) + closest_new_bbox[0]*alpha),int(closest_prev_bbox[1]*(1-alpha) + closest_new_bbox[1]*alpha), closest_new_bbox[2], closest_new_bbox[3])
@@ -106,10 +107,10 @@ def process_loi_status(status, dir_bool, prev_bbox, prev_status, LOI_BOX):
                 prev_bbox[0] >= LOI_BOX[0]+LOI_BOX[2]):
             traffic_event+=1
         status = 'None'
-    elif not dir_bool and status == 'Top' and prev_status == 'Bottom':
+    elif dir_bool and status == 'Top' and prev_status == 'Bottom':
         traffic_event+=1
         status = 'None'
-    elif dir_bool and status == 'Bottom' and prev_status == 'Top':
+    elif not dir_bool and status == 'Bottom' and prev_status == 'Top':
         traffic_event+=1
         status = 'None'
     elif status == 'None':
@@ -192,6 +193,11 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
         Tuple of in_count and out_count
     """
 
+    config = json.load(open('config.json', 'r'))
+    
+    net = apollocaffe.ApolloNet()
+    apollocaffe.set_device(0)
+
     walkin = 0
     walkout = 0
     
@@ -199,32 +205,35 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
     vidcap = cv2.VideoCapture(video_file)
     success, frame = get_frame(vidcap)
 
+#    for _ in range(11430):
+#        success, frame = get_frame(vidcap)
+
+    #set up nnet (build nnet & load weights)
+    nnet.build_nnet(frame, config, net)
+ 
     prev_bboxes = {}
     prev_loi_status = {}
-    for _ in range(2015):
-	vidcap.read()
 
     count = 0
     while success:        
-        new_bboxes = nnet.process_frame(frame, count)
+        new_bboxes = nnet.process_frame(frame, count, config, net)
         win, wout, prev_bboxes, prev_loi_status = process_bboxes(new_bboxes, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT)
  
         walkin += win
         walkout += wout
 
         #TODO
-        print prev_loi_status
+        #print prev_loi_status
         cv2.rectangle(frame, (LOI_BOX_IN[0], LOI_BOX_IN[1]), (LOI_BOX_IN[0]+LOI_BOX_IN[2], LOI_BOX_IN[1]+LOI_BOX_IN[3]), (0,255,0))
         cv2.rectangle(frame, (LOI_BOX_OUT[0], LOI_BOX_OUT[1]), (LOI_BOX_OUT[0]+LOI_BOX_OUT[2], LOI_BOX_OUT[1]+LOI_BOX_OUT[3]), (255,0,0))
         cv2.putText(frame,str((walkin, walkout)), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
         cv2.imwrite("test_output/frame%s.jpg" % count, frame)
-
+        success, frame = get_frame(vidcap)
         sucess, frame = get_frame(vidcap)
         count += 1
-        if count == 500:
-           break
-        print walkin, walkout, count
+        #print walkin, walkout, count
 
+    print walkin,walkout, count
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="parse video using nnet")

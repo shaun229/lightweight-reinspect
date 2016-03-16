@@ -291,7 +291,6 @@ def test(config):
                 continue
             else:
                 print 'found', rect.true_confidence
-                raw_input()
                 cv2.rectangle(image, (rect.cx-int(rect.width/2), rect.cy-int(rect.height/2)),
                                    (rect.cx+int(rect.width/2), rect.cy+int(rect.height/2)),
                                    (255,0,0),
@@ -367,13 +366,23 @@ def train(config):
                            'test_loss': loss_hist["test"],
                            'apollo_net': net, 'start_iter': 0})
 
-
-def process_frame(frame, frame_count):
-    '''process uinsg reinspect'''
-    config = json.load(open('config.json', 'r'))
+def build_nnet(frame, config, net):
+    '''used to build the nnet with the correct weight before calling process_frame'''
+    net_config = config["net"]
+    data_config = config["data"]
+    solver = config["solver"]
     
-    net = apollocaffe.ApolloNet()
-    apollocaffe.set_device(0)
+    image_mean = load_data_mean(
+        data_config["idl_mean"], net_config["img_width"],
+        net_config["img_height"], image_scaling=1.0)
+
+    image  = image_to_h5(frame, image_mean, image_scaling=1.0)
+    input_test = {"imname": '', "raw": frame, "image": image}
+    forward(net, input_test, config["net"], True)
+    net.load(solver['weights'])
+
+def process_frame(frame, frame_count, config, net):
+    '''process uinsg reinspect'''
 
     net_config = config["net"]
     data_config = config["data"]
@@ -383,15 +392,10 @@ def process_frame(frame, frame_count):
         data_config["idl_mean"], net_config["img_width"],
         net_config["img_height"], image_scaling=1.0)
 
-
     image  = image_to_h5(frame, image_mean, image_scaling=1.0)
 
     input_test = {"imname": '', "raw": frame, "image": image}
 
-
-    forward(net, input_test, config["net"], True)
-
-    net.load(solver["weights"])
 
     net.phase = 'test'
     bbox, conf = forward(net, input_test, config["net"], True)
@@ -418,10 +422,10 @@ def process_frame(frame, frame_count):
     bbox_res = []
     for idx, rect in enumerate(acc_rects):
         if rect.true_confidence < 0.8:
-            print 'rejected', rect.true_confidence
+#            print 'rejected', rect.true_confidence
             continue
         else:
-            print 'found', rect.true_confidence
+#            print 'found', rect.true_confidence
             cv2.rectangle(frame, (rect.cx-int(rect.width/2), rect.cy-int(rect.height/2)),
                                (rect.cx+int(rect.width/2), rect.cy+int(rect.height/2)),
                                (255,0,0),
