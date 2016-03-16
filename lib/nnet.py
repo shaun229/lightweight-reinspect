@@ -41,7 +41,7 @@ def load_idl(idlfile, data_mean, net_config, jitter=False, train=False):
                 jit_anno = anno
             image = image_to_h5(jit_image, data_mean, image_scaling=1.0)
             boxes, box_flags = annotation_to_h5(
-                jit_anno, net_config["grid_width"], net_config["grid_height"],
+                jit_anno.rects, net_config["grid_width"], net_config["grid_height"],
                 net_config["region_size"], net_config["max_len"])
             yield {"imname": anno.imageName, "raw": jit_image, "image": image,
                    "boxes": boxes, "box_flags": box_flags, "anno": jit_anno}
@@ -365,6 +365,41 @@ def train(config):
             logger.log(i, {'train_loss': loss_hist["train"],
                            'test_loss': loss_hist["test"],
                            'apollo_net': net, 'start_iter': 0})
+
+def train_single_frame(frame, bboxes, config, net):
+    '''learn from single frame to account for environmental changes'''
+    net_config = config["net"]
+    data_config = config["data"]
+    solver = config["solver"]
+
+    image_mean = load_data_mean(
+        data_config["idl_mean"], net_config["img_width"],
+        net_config["img_height"], image_scaling=1.0)
+
+    image  = image_to_h5(frame, image_mean, image_scaling=1.0)
+
+    anno_rects = []
+    for bbox in bboxes:
+        rect = al.AnnoRect()
+        rect.x1 = bbox[0]
+        rect.y1 = bbox[1]   
+        rect.x2 = rect.x1 + bbox[2]
+        rect.y2 = rect.y1 + bbox[3]
+        anno_rects.append(rect)
+
+    boxes, box_flags = annotation_to_h5(
+        anno_rects, net_config["grid_width"], net_config["grid_height"],
+        net_config["region_size"], net_config["max_len"])
+
+    input_dict = {"imname": '', "raw": frame, "image": image, "boxes": boxes, "box_flags": box_flags}
+
+    forward(net, input_dict, config["net"])
+    net.backward()
+    learning_rate = (solver["base_lr"] *
+                     (solver["gamma"])**(10000 // solver["stepsize"]))
+    net.update(lr=learning_rate, momentum=solver["momentum"],
+               clip_gradients=solver["clip_gradients"])
+
 
 def build_nnet(frame, config, net):
     '''used to build the nnet with the correct weight before calling process_frame'''

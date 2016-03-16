@@ -216,7 +216,13 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
 
     count = 0
     while success:        
+        #process frame to get bboxes 
         new_bboxes = nnet.process_frame(frame, count, config, net)
+        
+        #update the model to adapt to environmental changes
+        if len(new_bboxes) > 0 and count % 30 == 0:
+            nnet.train_single_frame(frame, new_bboxes, config, net)
+
         win, wout, prev_bboxes, prev_loi_status = process_bboxes(new_bboxes, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT)
  
         walkin += win
@@ -229,7 +235,7 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
         cv2.putText(frame,str((walkin, walkout)), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
         cv2.imwrite("test_output/frame%s.jpg" % count, frame)
         success, frame = get_frame(vidcap)
-        sucess, frame = get_frame(vidcap)
+        success, frame = get_frame(vidcap)
         count += 1
         #print walkin, walkout, count
 

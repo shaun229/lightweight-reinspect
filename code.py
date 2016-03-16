@@ -41,7 +41,7 @@ def load_idl(idlfile, data_mean, net_config, jitter=False, train=False):
                 jit_anno = anno
             image = image_to_h5(jit_image, data_mean, image_scaling=1.0)
             boxes, box_flags = annotation_to_h5(
-                jit_anno, net_config["grid_width"], net_config["grid_height"],
+                jit_anno.rects, net_config["grid_width"], net_config["grid_height"],
                 net_config["region_size"], net_config["max_len"])
             yield {"imname": anno.imageName, "raw": jit_image, "image": image,
                    "boxes": boxes, "box_flags": box_flags, "anno": jit_anno}

@@ -35,7 +35,7 @@ def image_to_h5(I, data_mean, image_scaling = 1.0):
     h5_image = np.transpose(I, (2,0,1)).reshape(data_shape) 
     return h5_image
 
-def annotation_to_h5(a, cell_width, cell_height, region_size, max_len):
+def annotation_to_h5(anno_rects, cell_width, cell_height, region_size, max_len):
     cell_regions = get_cell_grid(cell_width, cell_height, region_size)
 
     cells_per_image = len(cell_regions)
@@ -43,7 +43,7 @@ def annotation_to_h5(a, cell_width, cell_height, region_size, max_len):
     box_list = [[] for idx in range(cells_per_image)]
             
     for cidx, c in enumerate(cell_regions):
-        box_list[cidx] = [r for r in a.rects if all(r.intersection(c))]
+        box_list[cidx] = [r for r in anno_rects if all(r.intersection(c))]
 
     boxes = np.zeros((1, cells_per_image, 4, max_len, 1), dtype = np.float)
     box_flags = np.zeros((1, cells_per_image, 1, max_len, 1), dtype = np.float)
