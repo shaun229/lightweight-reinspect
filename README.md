@@ -1,0 +1,2 @@
+Depdencies:
+pip install azure

@@ -62,17 +62,19 @@ def generate_decapitated_googlenet(net, net_config):
 
         net.f(layer)
         #try reducing image size more agressively during first pooling phase
-        if layer.p.name == "inception_3b/output":
-           net.f('''
-                name: "pool_final"
-                type: "Pooling"
-                bottom: "inception_3b/output"
-                top: "inception_3b/output_final"
-                pooling_param {
-                    kernel_size: 4
-                    stride: 4
-                }''')
-           break
+#        if layer.p.name == "inception_3b/output":
+#           net.f('''
+#                name: "pool_final"
+#                type: "Pooling"
+#                bottom: "inception_3b/output"
+#                top: "inception_3b/output_final"
+#                pooling_param {
+#                    kernel_size: 4
+#                    stride: 4
+#                }''')
+#           break
+        if layer.p.name == "inception_5b/output":
+            break
 
 
 def generate_intermediate_layers(net):
@@ -80,7 +82,7 @@ def generate_intermediate_layers(net):
     from a NxCxWxH to (NxWxH)xCx1x1 that is used as input for the lstm layers.
     N = batch size, C = channels, W = grid width, H = grid height."""
 
-    net.f(Convolution("post_fc7_conv", bottoms=["inception_3b/output_final"],
+    net.f(Convolution("post_fc7_conv", bottoms=["inception_5b/output"],
                       param_lr_mults=[1., 2.], param_decay_mults=[0., 0.],
                       num_output=1024, kernel_dim=(1, 1),
                       weight_filler=Filler("gaussian", 0.005),
@@ -366,8 +368,31 @@ def train(config):
                            'test_loss': loss_hist["test"],
                            'apollo_net': net, 'start_iter': 0})
 
-def train_single_frame(frame, bboxes, config, net):
+def train_single_frame(frame, bboxes, conf, dist, config, net):
     '''learn from single frame to account for environmental changes'''
+    '''Updates based on the following: 
+           Good Positive Sample has high confidence and is in motion
+           Good Negative Sample has low confidence and is stationary'''
+
+    bool found = False
+    anno_rects = []
+    for idx, bbox in enumerate(bboxes):
+        if conf[idx] > 0.95 and dist[idx] > 5: #Good positive sample
+            rect = al.AnnoRect()
+            rect.x1 = bbox[0]
+            rect.y1 = bbox[1]   
+            rect.x2 = rect.x1 + bbox[2]
+            rect.y2 = rect.y1 + bbox[3]
+            anno_rects.append(rect)
+            found = True
+        elif conf[idx] < 0.85 and dist[idx] < 5: #Good negative sample
+            found = True 
+ 
+    if not found:
+        return
+
+    print 'updating weights'
+
     net_config = config["net"]
     data_config = config["data"]
     solver = config["solver"]
@@ -378,14 +403,6 @@ def train_single_frame(frame, bboxes, config, net):
 
     image  = image_to_h5(frame, image_mean, image_scaling=1.0)
 
-    anno_rects = []
-    for bbox in bboxes:
-        rect = al.AnnoRect()
-        rect.x1 = bbox[0]
-        rect.y1 = bbox[1]   
-        rect.x2 = rect.x1 + bbox[2]
-        rect.y2 = rect.y1 + bbox[3]
-        anno_rects.append(rect)
 
     boxes, box_flags = annotation_to_h5(
         anno_rects, net_config["grid_width"], net_config["grid_height"],
@@ -396,8 +413,8 @@ def train_single_frame(frame, bboxes, config, net):
     forward(net, input_dict, config["net"])
     net.backward()
     learning_rate = (solver["base_lr"] *
-                     (solver["gamma"])**(10000 // solver["stepsize"]))
-    net.update(lr=learning_rate, momentum=solver["momentum"],
+                     (solver["gamma"])**(5))
+    net.update(lr=learning_rate, momentum=0,
                clip_gradients=solver["clip_gradients"])
 
 
@@ -455,8 +472,9 @@ def process_frame(frame, frame_count, config, net):
     #print acc_rects
 
     bbox_res = []
+    conf_res = []
     for idx, rect in enumerate(acc_rects):
-        if rect.true_confidence < 0.8:
+        if rect.true_confidence < 0.80:
 #            print 'rejected', rect.true_confidence
             continue
         else:
@@ -465,9 +483,11 @@ def process_frame(frame, frame_count, config, net):
                                (rect.cx+int(rect.width/2), rect.cy+int(rect.height/2)),
                                (255,0,0),
                                2)
+            cv2.putText(frame,str(int(rect.true_confidence * 100)), (rect.cx-10,rect.cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
             bbox_res.append((rect.cx, rect.cy, rect.width, rect.height))
+            conf_res.append(rect.true_confidence)
     #cv2.imwrite("/home/ubuntu/lightweight-reinspect/test_output2/img_out%s.jpg" % frame_count, frame)
-    return bbox_res
+    return (bbox_res, conf_res)
 
 
 def main():
