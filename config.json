@@ -14,7 +14,7 @@
         "clip_gradients": 0.1,
         "gamma": 0.8,
         "stepsize": 100000,
-        "weights": "weights/video_footwear_5b.h5"
+        "weights": "weights/video_footwear_5b_mean.h5"
     },
     "logging": {
         "display_interval": 100,
