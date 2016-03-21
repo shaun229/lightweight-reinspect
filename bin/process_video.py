@@ -129,13 +129,16 @@ def process_loi_status(status, dir_bool, prev_bbox, prev_status, LOI_BOX):
     return [traffic_event, status]
         
 
-def process_bboxes(new_bboxes, distance_vec, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT):
+def process_bboxes(new_bboxes, distance_vec, prev_bboxes_dict, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT):
     '''Detect walkin/walkout if two lines are tripped and update loi status'''
     '''also updates distance values for new bboxes, which is used for retraining the nnet'''
 
     new_loi_status = {}
     new_prev_bboxes = []
     processed_bbox_set = set()
+
+    #prev_bboxes are the keys, age is the value
+    prev_bboxes = prev_bboxes_dict.keys()
 
     walkin = 0
     walkout = 0
@@ -161,6 +164,9 @@ def process_bboxes(new_bboxes, distance_vec, prev_bboxes, prev_loi_status, LOI_B
         #update walkin and walkout
         walkin += in_count
         walkout += out_count    
+
+        if in_count > 0 or out_count > 0:
+            print walkin, walkout
             
         #update loi status for next frame
         new_loi_status[closest_new_bbox] = [in_status, out_status]
@@ -170,6 +176,8 @@ def process_bboxes(new_bboxes, distance_vec, prev_bboxes, prev_loi_status, LOI_B
         distance_vec[closest_new_bbox_idx] = dist
         #prevent closest_new_bbox to be found again
         processed_bbox_set.add(closest_new_bbox_idx)
+        #prevent closest_prev_bbox to be found again
+        del prev_bboxes[closest_prev_bbox_idx]
     
     #process bboxes which are new (i.e. ones we could not find a prev_bbox)
     for idx, bbox in enumerate(new_bboxes):
@@ -181,7 +189,17 @@ def process_bboxes(new_bboxes, distance_vec, prev_bboxes, prev_loi_status, LOI_B
         #add any remaining bboxes
         new_prev_bboxes.append(bbox)
 
-    return (walkin, walkout, new_prev_bboxes, new_loi_status)
+    #prev_bbox_dict for net frame
+    new_prev_bboxes_dict = {}
+    for bbox in new_prev_bboxes:
+        new_prev_bboxes_dict[bbox] = 0
+
+    #add old bboxes which were not matched in this frame as long as they are not too old
+    for bbox in prev_bboxes:
+        if prev_bboxes_dict[bbox] < 3:
+            new_prev_bboxes_dict[bbox] = prev_bboxes_dict[bbox] + 1
+
+    return (walkin, walkout, new_prev_bboxes_dict, new_loi_status)
 
 def get_frame(vidcap):
     success, frame = vidcap.read()
@@ -228,7 +246,7 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
     #set up nnet (build nnet & load weights)
     nnet.build_nnet(frame, config, net)
  
-    prev_bboxes = {}
+    prev_bboxes_dict = {}
     prev_loi_status = {}
 
     count = 0
@@ -237,7 +255,7 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
         new_bboxes, new_conf = nnet.process_frame(frame, count, config, net)
         distance_vec = [None]*len(new_bboxes)
         #process bboxes and update distance_vec
-        win, wout, prev_bboxes,  prev_loi_status = process_bboxes(new_bboxes, distance_vec, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT)
+        win, wout, prev_bboxes_dict,  prev_loi_status = process_bboxes(new_bboxes, distance_vec, prev_bboxes_dict, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT)
         #update the model to adapt to environmental changes, Note prev_bboxes != new_bboxes, they are in diff order!
 #        nnet.train_single_frame(frame, new_bboxes, new_conf, distance_vec, config, net)
  
@@ -246,10 +264,10 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
 
         #TODO
         #print prev_loi_status, walkin, walkout
-#        cv2.rectangle(frame, (LOI_BOX_IN[0], LOI_BOX_IN[1]), (LOI_BOX_IN[0]+LOI_BOX_IN[2], LOI_BOX_IN[1]+LOI_BOX_IN[3]), (0,255,0))
-#        cv2.rectangle(frame, (LOI_BOX_OUT[0], LOI_BOX_OUT[1]), (LOI_BOX_OUT[0]+LOI_BOX_OUT[2], LOI_BOX_OUT[1]+LOI_BOX_OUT[3]), (255,0,0))
-#        cv2.putText(frame,str((walkin, walkout)), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
-#        cv2.imwrite("test_output/frame%s.jpg" % count, frame)
+        cv2.rectangle(frame, (LOI_BOX_IN[0], LOI_BOX_IN[1]), (LOI_BOX_IN[0]+LOI_BOX_IN[2], LOI_BOX_IN[1]+LOI_BOX_IN[3]), (0,255,0))
+        cv2.rectangle(frame, (LOI_BOX_OUT[0], LOI_BOX_OUT[1]), (LOI_BOX_OUT[0]+LOI_BOX_OUT[2], LOI_BOX_OUT[1]+LOI_BOX_OUT[3]), (255,0,0))
+        cv2.putText(frame,str((walkin, walkout)), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+        cv2.imwrite("test_output/frame%s.jpg" % count, frame)
         #process every other frame
         if count % 3 == 0:
             get_frame(vidcap)
