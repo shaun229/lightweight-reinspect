@@ -164,9 +164,6 @@ def process_bboxes(new_bboxes, distance_vec, prev_bboxes_dict, prev_loi_status, 
         #update walkin and walkout
         walkin += in_count
         walkout += out_count    
-
-        if in_count > 0 or out_count > 0:
-            print walkin, walkout
             
         #update loi status for next frame
         new_loi_status[closest_new_bbox] = [in_status, out_status]
@@ -198,6 +195,7 @@ def process_bboxes(new_bboxes, distance_vec, prev_bboxes_dict, prev_loi_status, 
     for bbox in prev_bboxes:
         if prev_bboxes_dict[bbox] < 3:
             new_prev_bboxes_dict[bbox] = prev_bboxes_dict[bbox] + 1
+            new_loi_status[bbox] = prev_loi_status[bbox]
 
     return (walkin, walkout, new_prev_bboxes_dict, new_loi_status)
 
@@ -259,6 +257,8 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
         #update the model to adapt to environmental changes, Note prev_bboxes != new_bboxes, they are in diff order!
 #        nnet.train_single_frame(frame, new_bboxes, new_conf, distance_vec, config, net)
  
+        if win > 0 or wout > 0:
+            print walkin, walkout
         walkin += win
         walkout += wout
 
