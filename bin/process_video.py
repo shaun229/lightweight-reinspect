@@ -75,7 +75,7 @@ def smoothBBoxPair(closest_new_bbox, closest_prev_bbox):
     #TODO
     global frame
     cv2.circle(frame, (closest_prev_bbox[0], closest_prev_bbox[1]), 6, (0,0,255))
-    cv2.putText(frame,str(int(min_dist)), (closest_prev_bbox[0]+8, closest_prev_bbox[1]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+#    cv2.putText(frame,str(int(min_dist)), (closest_prev_bbox[0]+8, closest_prev_bbox[1]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
     cv2.circle(frame, (closest_new_bbox[0], closest_new_bbox[1]), 6, (0,255,0))
 
     return (int(closest_prev_bbox[0]*(1-alpha) + closest_new_bbox[0]*alpha), \
@@ -221,7 +221,8 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
     vidcap = cv2.VideoCapture(video_file)
     success, frame = get_frame(vidcap)
 
-#    for _ in range(500):
+#skip initil frames for debuging
+#    for _ in range(5700):
 #        success, frame = get_frame(vidcap)
 
     #set up nnet (build nnet & load weights)
@@ -238,24 +239,24 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
         #process bboxes and update distance_vec
         win, wout, prev_bboxes,  prev_loi_status = process_bboxes(new_bboxes, distance_vec, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT)
         #update the model to adapt to environmental changes, Note prev_bboxes != new_bboxes, they are in diff order!
-        nnet.train_single_frame(frame, new_bboxes, new_conf, distance_vec, config, net)
+#        nnet.train_single_frame(frame, new_bboxes, new_conf, distance_vec, config, net)
  
         walkin += win
         walkout += wout
 
         #TODO
         #print prev_loi_status, walkin, walkout
-        cv2.rectangle(frame, (LOI_BOX_IN[0], LOI_BOX_IN[1]), (LOI_BOX_IN[0]+LOI_BOX_IN[2], LOI_BOX_IN[1]+LOI_BOX_IN[3]), (0,255,0))
-        cv2.rectangle(frame, (LOI_BOX_OUT[0], LOI_BOX_OUT[1]), (LOI_BOX_OUT[0]+LOI_BOX_OUT[2], LOI_BOX_OUT[1]+LOI_BOX_OUT[3]), (255,0,0))
-        cv2.putText(frame,str((walkin, walkout)), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
-        cv2.imwrite("test_output/frame%s.jpg" % count, frame)
+#        cv2.rectangle(frame, (LOI_BOX_IN[0], LOI_BOX_IN[1]), (LOI_BOX_IN[0]+LOI_BOX_IN[2], LOI_BOX_IN[1]+LOI_BOX_IN[3]), (0,255,0))
+#        cv2.rectangle(frame, (LOI_BOX_OUT[0], LOI_BOX_OUT[1]), (LOI_BOX_OUT[0]+LOI_BOX_OUT[2], LOI_BOX_OUT[1]+LOI_BOX_OUT[3]), (255,0,0))
+#        cv2.putText(frame,str((walkin, walkout)), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+#        cv2.imwrite("test_output/frame%s.jpg" % count, frame)
         #process every other frame
         if count % 3 == 0:
             get_frame(vidcap)
         success, frame = get_frame(vidcap)
         count += 1
         
-        if count == 10000:
+        if count == 15000:
             count = 0
         #print walkin, walkout, count
 

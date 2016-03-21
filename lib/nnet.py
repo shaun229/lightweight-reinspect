@@ -374,10 +374,10 @@ def train_single_frame(frame, bboxes, conf, dist, config, net):
            Good Positive Sample has high confidence and is in motion
            Good Negative Sample has low confidence and is stationary'''
 
-    bool found = False
+    found = False
     anno_rects = []
     for idx, bbox in enumerate(bboxes):
-        if conf[idx] > 0.95 and dist[idx] > 5: #Good positive sample
+        if conf[idx] > 0.85 or (conf[idx] > 0.8 and dist[idx] > 3): #Good positive sample
             rect = al.AnnoRect()
             rect.x1 = bbox[0]
             rect.y1 = bbox[1]   
@@ -385,7 +385,7 @@ def train_single_frame(frame, bboxes, conf, dist, config, net):
             rect.y2 = rect.y1 + bbox[3]
             anno_rects.append(rect)
             found = True
-        elif conf[idx] < 0.85 and dist[idx] < 5: #Good negative sample
+        elif conf[idx] < 0.65 and dist[idx] != None and dist[idx] < 3: #Good negative sample
             found = True 
  
     if not found:
@@ -412,7 +412,7 @@ def train_single_frame(frame, bboxes, conf, dist, config, net):
 
     forward(net, input_dict, config["net"])
     net.backward()
-    learning_rate = (solver["base_lr"] *
+    learning_rate = (0.1 *
                      (solver["gamma"])**(5))
     net.update(lr=learning_rate, momentum=0,
                clip_gradients=solver["clip_gradients"])
@@ -474,7 +474,7 @@ def process_frame(frame, frame_count, config, net):
     bbox_res = []
     conf_res = []
     for idx, rect in enumerate(acc_rects):
-        if rect.true_confidence < 0.80:
+        if rect.true_confidence < 0.9:
 #            print 'rejected', rect.true_confidence
             continue
         else:

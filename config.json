@@ -2,11 +2,11 @@
     "data": {
         "test_idl": "./data/combined.idl",
         "train_idl": "./data/combined.idl",
-        "idl_mean": "./data/zero_mean.npy"
+        "idl_mean": "./data/combined_mean.npy"
     },
     "solver": {
         "base_lr": 0.2,
-        "max_iter": 100001,
+        "max_iter": 300001,
         "test_iter": 150,
         "test_interval": 300,
         "momentum": 0.5,
