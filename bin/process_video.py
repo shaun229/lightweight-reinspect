@@ -170,6 +170,8 @@ def process_bboxes(new_bboxes, distance_vec, prev_bboxes, prev_loi_status, LOI_B
         distance_vec[closest_new_bbox_idx] = dist
         #prevent closest_new_bbox to be found again
         processed_bbox_set.add(closest_new_bbox_idx)
+        #prevent closest_prev_bbox to be found again
+        del prev_bboxes[closest_prev_bbox_idx]
     
     #process bboxes which are new (i.e. ones we could not find a prev_bbox)
     for idx, bbox in enumerate(new_bboxes):

@@ -474,7 +474,7 @@ def process_frame(frame, frame_count, config, net):
     bbox_res = []
     conf_res = []
     for idx, rect in enumerate(acc_rects):
-        if rect.true_confidence < 0.9:
+        if rect.true_confidence < 0.6:
 #            print 'rejected', rect.true_confidence
             continue
         else:
