@@ -8,7 +8,7 @@ import copy
 import annolist.AnnotationLib as al
 from rect import Rect
 
-from scipy.misc import imread, imresize, imsave
+from cv2 import imread, imwrite
 from munkres import Munkres, print_matrix, make_cost_matrix
 
 from stitch_wrapper import stitch_rects
@@ -16,9 +16,9 @@ from stitch_wrapper import stitch_rects
 def load_data_mean(data_mean_filename, img_width, img_height, image_scaling = 1.0):
     data_mean = np.load(data_mean_filename)
     data_mean = data_mean.astype(np.float32) / image_scaling
-    data_mean = np.transpose(data_mean, (1, 2, 0))
+#    data_mean = np.transpose(data_mean, (1, 2, 0)) 
 
-    data_mean = imresize(data_mean, size=(img_height, img_width), interp='bicubic')
+#    data_mean = imresize(data_mean, size=(img_height, img_width), interp='bicubic') 
 
     data_mean = data_mean.astype(np.float32) / image_scaling
     return data_mean
@@ -27,9 +27,8 @@ def image_to_h5(I, data_mean, image_scaling = 1.0):
 
     # normalization as needed for ipython notebook
     I = I.astype(np.float32) / image_scaling - data_mean
-
     # MA: model expects BGR ordering
-    I = I[:, :, (2, 1, 0)]
+#    I = I[:, :, (2, 1, 0)] Shaun: Not neccessary!
 
     data_shape = (1, I.shape[2], I.shape[0], I.shape[1])
     h5_image = np.transpose(I, (2,0,1)).reshape(data_shape) 

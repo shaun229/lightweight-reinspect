@@ -7,7 +7,7 @@ import numpy as np
 import json
 import os
 import random
-from scipy.misc import imread
+from cv2 import imread
 import apollocaffe
 from apollocaffe.models import googlenet
 from apollocaffe.layers import (Power, LstmUnit, Convolution, NumpyData,
@@ -249,7 +249,7 @@ def test(config):
 
     image_mean = load_data_mean(
         data_config["idl_mean"], net_config["img_width"],
-        net_config["img_height"], image_scaling=1.0)
+        net_config["img_height"])
 
     input_gen_test = load_idl(data_config["test_idl"],
                                    image_mean, net_config, jitter=False)
@@ -312,7 +312,7 @@ def train(config):
 
     image_mean = load_data_mean(
         data_config["idl_mean"], net_config["img_width"],
-        net_config["img_height"], image_scaling=1.0)
+        net_config["img_height"])
 
     input_gen = load_idl(data_config["train_idl"],
                               image_mean, net_config, jitter=False, train=True)
@@ -399,7 +399,7 @@ def train_single_frame(frame, bboxes, conf, dist, config, net):
 
     image_mean = load_data_mean(
         data_config["idl_mean"], net_config["img_width"],
-        net_config["img_height"], image_scaling=1.0)
+        net_config["img_height"])
 
     image  = image_to_h5(frame, image_mean, image_scaling=1.0)
 
@@ -426,7 +426,7 @@ def build_nnet(frame, config, net):
     
     image_mean = load_data_mean(
         data_config["idl_mean"], net_config["img_width"],
-        net_config["img_height"], image_scaling=1.0)
+        net_config["img_height"])
 
     image  = image_to_h5(frame, image_mean, image_scaling=1.0)
     input_test = {"imname": '', "raw": frame, "image": image}
@@ -442,7 +442,7 @@ def process_frame(frame, frame_count, config, net):
     
     image_mean = load_data_mean(
         data_config["idl_mean"], net_config["img_width"],
-        net_config["img_height"], image_scaling=1.0)
+        net_config["img_height"])
 
     image  = image_to_h5(frame, image_mean, image_scaling=1.0)
 
