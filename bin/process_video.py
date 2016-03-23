@@ -7,7 +7,8 @@ import json
 import apollocaffe
 import random
 
-DIST_THRESHOLD = 60
+DIST_THRESHOLD = 60 #max distance for matching bbox from frame to frame
+MAX_AGE = 2 #max no of frames a bbox can last for without being matched
 
 def detect_line_trip(bbox1, bbox2, x1, x2, y):
     '''detect if a horizontal line was tripped'''
@@ -102,8 +103,8 @@ def getClosestBBoxPair(new_bboxes, prev_bboxes, processed_bbox_set):
 def process_loi_status(status, dir_bool, prev_bbox, prev_status, LOI_BOX):
     '''detect if a walkin/walkout event occured and update loi status'''
 
-    assert status in ['Both', 'Top', 'Bottom', 'None']
-    assert prev_status in ['Both', 'Top', 'Bottom', 'None']
+    assert status in ['Both', 'Top', 'Bottom', 'None', 'Omni']
+    assert prev_status in ['Both', 'Top', 'Bottom', 'None', 'Omni']
 
     traffic_event = 0 #can be a walkin or walkout depending on dir_bool & LOI_BOX
     if status == 'Both':
@@ -114,28 +115,40 @@ def process_loi_status(status, dir_bool, prev_bbox, prev_status, LOI_BOX):
                 prev_bbox[0] >= LOI_BOX[0]+LOI_BOX[2]):
             traffic_event+=1
         status = 'None'
-    elif dir_bool and status == 'Top' and prev_status == 'Bottom':
+    elif dir_bool and status == 'Top' and (prev_status == 'Bottom' or prev_status == 'Omni'):
         traffic_event+=1
         status = 'None'
-    elif not dir_bool and status == 'Bottom' and prev_status == 'Top':
+    elif not dir_bool and status == 'Bottom' and (prev_status == 'Top' or prev_status == 'Omni'):
         traffic_event+=1
         status = 'None'
     elif status == 'None':
         status = prev_status
 
     assert traffic_event <= 1 
-    assert status in ['Both', 'Top', 'Bottom', 'None']
+    assert status in ['Both', 'Top', 'Bottom', 'None', 'Omni']
 
     return [traffic_event, status]
         
+def unmatched_bbox_loi_status(bbox, LOI_BOX):
+    '''for new bboxes that couldn't be matched a bbox in prev frames, get their loi status'''
+    '''the only status they can have is either None or Omni'''
+    if (LOI_BOX[0] <= bbox[0] and bbox[0] <= LOI_BOX[0] + LOI_BOX[2]) and (LOI_BOX[1] <= bbox[1] and bbox[1] <= LOI_BOX[1] + LOI_BOX[3]):
+        #new bbox appeared inside the loi
+        return 'Omni' 
+    else:
+        return 'None'
 
-def process_bboxes(new_bboxes, distance_vec, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT):
+def process_bboxes(new_bboxes, distance_vec, prev_bboxes_dict, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT):
     '''Detect walkin/walkout if two lines are tripped and update loi status'''
     '''also updates distance values for new bboxes, which is used for retraining the nnet'''
 
     new_loi_status = {}
-    new_prev_bboxes = []
+ #   new_prev_bboxes = [] - replaced by new_prev_bboxes_dict.keys()
+    new_prev_bboxes_dict = {}
     processed_bbox_set = set()
+
+    #prev_bboxes are the keys, age is the value
+    prev_bboxes = prev_bboxes_dict.keys()
 
     walkin = 0
     walkout = 0
@@ -165,7 +178,14 @@ def process_bboxes(new_bboxes, distance_vec, prev_bboxes, prev_loi_status, LOI_B
         #update loi status for next frame
         new_loi_status[closest_new_bbox] = [in_status, out_status]
         #update prev_bboxes for next frame
-        new_prev_bboxes.append(closest_new_bbox)
+#        new_prev_bboxes.append(closest_new_bbox)
+        #add to prev_bboxes_dict and update the age
+        #TODO move to sep func
+        if prev_bboxes_dict[closest_prev_bbox] == MAX_AGE:
+           new_prev_bboxes_dict[closest_new_bbox] = MAX_AGE
+        else:
+           new_prev_bboxes_dict[closest_new_bbox] = prev_bboxes_dict[closest_prev_bbox] + 1
+
         #store distance to previous bbox
         distance_vec[closest_new_bbox_idx] = dist
         #prevent closest_new_bbox to be found again
@@ -177,20 +197,26 @@ def process_bboxes(new_bboxes, distance_vec, prev_bboxes, prev_loi_status, LOI_B
     for idx, bbox in enumerate(new_bboxes):
         if idx in processed_bbox_set:
             continue
-        new_loi_status[bbox] = ['None', 'None']
+        in_status = unmatched_bbox_loi_status(bbox, LOI_BOX_IN)
+        out_status = unmatched_bbox_loi_status(bbox, LOI_BOX_OUT)
+        new_loi_status[bbox] = [in_status, out_status]
         #distance for these boxes are undefined
         distance_vec[idx] = None
         #add any remaining bboxes
-        new_prev_bboxes.append(bbox)
+        new_prev_bboxes_dict[bbox] = 0
 
-    return (walkin, walkout, new_prev_bboxes, new_loi_status)
+    #prev_bbox_dict for next frame
+#    new_prev_bboxes_dict = {}
+#   for bbox in new_prev_bboxes:
+#       new_prev_bboxes_dict[bbox] = 0
 
-def get_frame(vidcap):
-    success, frame = vidcap.read()
-    if not success:
-       return (success, None)
-    r, g, b = cv2.split(frame)
-    return (success, cv2.merge((b,g,r)))
+    #add old bboxes which were not matched in this frame as long as they are not too old
+    for bbox in prev_bboxes:
+        if prev_bboxes_dict[bbox] > 0:
+            new_prev_bboxes_dict[bbox] = prev_bboxes_dict[bbox] - 1
+            new_loi_status[bbox] = prev_loi_status[bbox]
+
+    return (walkin, walkout, new_prev_bboxes_dict, new_loi_status)
 
 def str2boolINOUT(INOUT):
     '''convert str INOUT to bool INOUT'''
@@ -221,41 +247,43 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
     
     global frame
     vidcap = cv2.VideoCapture(video_file)
-    success, frame = get_frame(vidcap)
+    success, frame = vidcap.read()
 
 #skip initil frames for debuging
-#    for _ in range(5700):
-#        success, frame = get_frame(vidcap)
+#    for _ in range(5750):
+#        success, frame = vidcap.read()
 
     #set up nnet (build nnet & load weights)
     nnet.build_nnet(frame, config, net)
  
-    prev_bboxes = {}
+    prev_bboxes_dict = {}
     prev_loi_status = {}
 
     count = 0
     while success:        
         #process frame to get bboxes 
+        #NOTE: unlike the loi, bboxes are provided as (center x, center y, width, height)
         new_bboxes, new_conf = nnet.process_frame(frame, count, config, net)
         distance_vec = [None]*len(new_bboxes)
         #process bboxes and update distance_vec
-        win, wout, prev_bboxes,  prev_loi_status = process_bboxes(new_bboxes, distance_vec, prev_bboxes, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT)
+        win, wout, prev_bboxes_dict, prev_loi_status = process_bboxes(new_bboxes, distance_vec, prev_bboxes_dict, prev_loi_status, LOI_BOX_IN, LOI_BOX_OUT, INOUT)
         #update the model to adapt to environmental changes, Note prev_bboxes != new_bboxes, they are in diff order!
 #        nnet.train_single_frame(frame, new_bboxes, new_conf, distance_vec, config, net)
  
         walkin += win
         walkout += wout
 
+        if win > 0 or wout > 0:
+            print walkin, walkout
+
         #TODO
-        #print prev_loi_status, walkin, walkout
+#        print count, prev_loi_status, prev_bboxes_dict, walkin, walkout
 #        cv2.rectangle(frame, (LOI_BOX_IN[0], LOI_BOX_IN[1]), (LOI_BOX_IN[0]+LOI_BOX_IN[2], LOI_BOX_IN[1]+LOI_BOX_IN[3]), (0,255,0))
 #        cv2.rectangle(frame, (LOI_BOX_OUT[0], LOI_BOX_OUT[1]), (LOI_BOX_OUT[0]+LOI_BOX_OUT[2], LOI_BOX_OUT[1]+LOI_BOX_OUT[3]), (255,0,0))
 #        cv2.putText(frame,str((walkin, walkout)), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
 #        cv2.imwrite("test_output/frame%s.jpg" % count, frame)
         #process every other frame
-        if count % 3 == 0:
-            get_frame(vidcap)
-        success, frame = get_frame(vidcap)
+        success, frame = vidcap.read()
         count += 1
         
         if count == 15000:

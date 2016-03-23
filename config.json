@@ -6,7 +6,7 @@
     },
     "solver": {
         "base_lr": 0.2,
-        "max_iter": 300001,
+        "max_iter": 200001,
         "test_iter": 150,
         "test_interval": 300,
         "momentum": 0.5,
@@ -14,7 +14,7 @@
         "clip_gradients": 0.1,
         "gamma": 0.8,
         "stepsize": 100000,
-        "weights": "weights/video_footwear_5b.h5"
+        "weights": "weights/video_footwear_5b_mean.h5"
     },
     "logging": {
         "display_interval": 100,

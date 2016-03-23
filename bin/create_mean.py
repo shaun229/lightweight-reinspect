@@ -1,10 +1,10 @@
 '''create the mean file from a folder of images'''
-import cv2
+from cv2 import imread, imwrite
 import numpy as np
 import argparse
 
 def main():
-    parser = argparse.ArgumentParser(description="create image mean from folder of images for nnet")
+    parser = argparse.ArgumentParser(description="create image mean from idl file")
     parser.add_argument('idl_file')
     idl_file = parser.parse_args().idl_file
 
@@ -21,7 +21,7 @@ def main():
 
         images.append(res)
         print res
-        img = cv2.imread(path+'/'+res)
+        img = imread(path+'/'+res)
         print path+'/'+res
         if img == None:
             print 'ERROR'
@@ -30,17 +30,15 @@ def main():
     avg_img = np.zeros((320,480,3))
     avg_img = avg_img.astype(float)
     for image in images:
-        img= cv2.imread(path+'/'+image)
+        img= imread(path+'/'+image)
         nd_img = img.astype(float)
-        print avg_img[0][0][0], img[0][0][0]
         avg_img += nd_img
         
-        print avg_img[0][0][0]
 
     avg_img /= len(images)
     print avg_img
     np.save('mean.npy', avg_img)
-        
+    imwrite('mean.jpg', avg_img.astype('uint8'))    
         
 
  
