@@ -2,7 +2,7 @@
     "data": {
         "test_idl": "./data/combined.idl",
         "train_idl": "./data/combined.idl",
-        "idl_mean": "./data/combined_mean.npy"
+        "idl_mean": "./data/zero_mean.npy"
     },
     "solver": {
         "base_lr": 0.2,
@@ -14,7 +14,7 @@
         "clip_gradients": 0.1,
         "gamma": 0.8,
         "stepsize": 100000,
-        "weights": "weights/video_footwear_5b_mean.h5"
+        "weights": "weights/video_footwear_5b.h5"
     },
     "logging": {
         "display_interval": 100,

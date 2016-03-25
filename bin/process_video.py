@@ -232,11 +232,10 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
             top-left corners of LoI boxes along with their widths and heights.
         INOUT: 2-tuple of booleans indicating direction and orientation of the LoI.
             First entry is True if in/out are vertical and False if in/out are horizontal.
-            Second entry is True if in is up or right and False if in is down or left.
+            Second entry is True if in is up or left and False if in is down or right.
     RETURNS:
         Tuple of in_count and out_count
     """
-
     config = json.load(open('config.json', 'r'))
     
     net = apollocaffe.ApolloNet()
@@ -281,8 +280,9 @@ def process_video(LOI_BOX_IN, LOI_BOX_OUT, INOUT, video_file):
 #        cv2.rectangle(frame, (LOI_BOX_IN[0], LOI_BOX_IN[1]), (LOI_BOX_IN[0]+LOI_BOX_IN[2], LOI_BOX_IN[1]+LOI_BOX_IN[3]), (0,255,0))
 #        cv2.rectangle(frame, (LOI_BOX_OUT[0], LOI_BOX_OUT[1]), (LOI_BOX_OUT[0]+LOI_BOX_OUT[2], LOI_BOX_OUT[1]+LOI_BOX_OUT[3]), (255,0,0))
 #        cv2.putText(frame,str((walkin, walkout)), (1,20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
-#        cv2.imwrite("test_output/frame%s.jpg" % count, frame)
+        cv2.imwrite("test_output/frame%s.jpg" % count, frame)
         #process every other frame
+        vidcap.read()
         success, frame = vidcap.read()
         count += 1
         
