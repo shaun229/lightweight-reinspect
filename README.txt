@@ -80,5 +80,6 @@ Disadvantages:
 -Takes hours to fix the counts
 -May not fix all errors, such as obstructions in the view, incorrect config files, etc
 
-
+We can also extend this idea to automate onboarding for new stores. Use the current weights file for a new store, and let
+the accuracy improve gradually.
 

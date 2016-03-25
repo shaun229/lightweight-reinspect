@@ -483,7 +483,7 @@ def process_frame(frame, frame_count, config, net):
                                (rect.cx+int(rect.width/2), rect.cy+int(rect.height/2)),
                                (255,0,0),
                                2)
-            cv2.putText(frame,str(int(rect.true_confidence * 100)), (rect.cx-10,rect.cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+            #cv2.putText(frame,str(int(rect.true_confidence * 100)), (rect.cx-10,rect.cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
             bbox_res.append((rect.cx, rect.cy, rect.width, rect.height))
             conf_res.append(rect.true_confidence)
     #cv2.imwrite("/home/ubuntu/lightweight-reinspect/test_output2/img_out%s.jpg" % frame_count, frame)
