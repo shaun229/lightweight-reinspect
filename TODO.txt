@@ -1,4 +1,0 @@
--Check for bug in loi status update
--try different image mean
--remove rgb color swap in load, do a better read or train w/out swap!
-
