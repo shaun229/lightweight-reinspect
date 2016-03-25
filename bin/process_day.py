@@ -36,15 +36,13 @@ def process_day(placement_name, date, loi_in, loi_out, inout):
     video_names = sorted(get_video_names(placement_name, date))
 
     #skip the first 17*4 + 2 = 70
-    video_names = video_names[70:]
-
+    f = open(str(placement_name)+'_'+date.strftime('%Y-%d-%m')+'_counts.txt', 'a')
     for video_name in video_names:
         print 'Processing video: ' + video_name
         download_video(video_name, 'temp_video.mp4')
         walkin, walkout, _ = process_video(loi_in, loi_out, inout, 'temp_video.mp4')
-        f = open('counts.txt', 'a')
         f.write(video_name + ':' + str(walkin) + ',' + str(walkout) + '\n')
-        f.close()
+    f.close()
 
 def str2boolINOUT(INOUT):
     '''convert str INOUT to bool INOUT'''
